@@ -51,11 +51,37 @@ def add_user():
 #creating store documents
 
 #creating item documents
+def add_item():
+    # Getting item inputs
+    item_id = input("Enter item ID: ")
+    item_name = input("Enter item name: ")
+    store_id = input("Enter store ID: ")
+    store_name = input("Enter store name: ")
+    price = float(input("Enter price: "))
+    ingredients = input("Enter ingredients (comma-separated): ").split(",")
+    calories = int(input("Enter calories: "))
+    
+    # Inserting into item documents
+    item_document = {
+        "Item_id": item_id,
+        "Item_name": item_name,
+        "Store_id": store_id,
+        "Store_name": store_name,
+        "Price": price,
+        "Ingredients": [i.strip() for i in ingredients],
+        "Calories": calories
+    }
 
+    try:
+        result = items_collection.insert_one(item_document)
+        print(f"Item {item_name} added with ID: {result.inserted_id}")
+    except pymongo.errors.PyMongoError as e:
+        print(f"An error occurred while adding the item: {e}")
 #creating recipe documents
 
 def main():
     add_user()
+    add_item()
     client.close()
 
 if __name__ == "__main__":
