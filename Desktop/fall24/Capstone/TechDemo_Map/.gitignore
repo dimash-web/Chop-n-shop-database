@@ -1,7 +1,0 @@
-*.pyc 
-__pycache__/
-.venv/
-.env
-.vscode/
-locations_map.html
-locations.json
