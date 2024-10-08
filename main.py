@@ -9,6 +9,7 @@ load_dotenv()
 
 mongodb_uri = os.getenv("MONGO_URI")
 client = pymongo.MongoClient(mongodb_uri)
+
 db = client["chop-n-shop"]
 users_collection = db["users"]
 stores_collection = db["stores"]
@@ -84,7 +85,7 @@ def add_item():
     ingredients = input("Enter ingredients (comma-separated): ").split(",")
     calories = input("Enter calories: ")
     
-    
+    #creating item documents - to be scraped from stores 
     item_document = {
         "Item_id": item_id,
         "Item_name": item_name,
