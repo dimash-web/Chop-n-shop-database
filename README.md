@@ -9,6 +9,12 @@ This is a simple command-line set-up of a database of grocery store prices and r
 
 ## Schema
 
+![ChopNShop-Schema](https://github.com/user-attachments/assets/e6810f15-d7c0-4022-abc4-dcc279b954de)
+
+
+
+
+
 ## Why We Chose MongoDB Over SQL
 
 We selected MongoDB for the Chop N' Shop application database for these reasons:
