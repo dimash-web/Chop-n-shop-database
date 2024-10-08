@@ -100,7 +100,25 @@ def add_item():
     except pymongo.errors.PyMongoError as e:
         print(f"An error occurred while adding the item: {e}")
 
+# Creating recipe documents
+def add_recipe():
+    # Getting recipe inputs
+    recipe_id = input("Enter recipe ID: ")
+    recipe_name = input("Enter recipe name: ")
+    ingredients = input("Enter ingredients (comma-separated): ").split(",")
 
+    # Inserting into recipe documents
+    recipe_document = {
+        "Recipe_id": recipe_id,
+        "Recipe_name": recipe_name,
+        "Ingredients": [i.strip() for i in ingredients]
+    }
+
+    try:
+        result = recipes_collections.insert_one(recipe_document)
+        print(f"Item {recipe_name} added with ID: {result.inserted_id}")
+    except pymongo.errors.PyMongoError as e:
+        print(f"An error occurred while adding the recipe: {e}")
 
 
 #using pandas to export sample user data from db
