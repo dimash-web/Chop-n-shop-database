@@ -76,16 +76,16 @@ def add_store():
 
 #creating item documents
 def add_item():
-    #creating placeholder variables for now - to be scraped 
-    item_id = str(uuid.uuid4())
-    item_name = "Cheesecake"
-    store_id = store['store_id']
-    store_name = store['store_name']
-    price = 6.99
-    ingredients = ["cheese", "milk", "flour", "sugar"]
-    calories = 360
     
-    #creating item documents - to be scraped from stores 
+    item_id = str(uuid.uuid4())
+    item_name = input("Enter item name: ")
+    store_id = input("Enter store ID: ")
+    store_name = input("Enter store name: ")
+    price = input("Enter item price: ")
+    ingredients = input("Enter ingredients (comma-separated): ").split(",")
+    calories = input("Enter calories: ")
+    
+    
     item_document = {
         "Item_id": item_id,
         "Item_name": item_name,
