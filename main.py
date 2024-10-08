@@ -54,17 +54,13 @@ def add_user():
 
 # Creating store documents
 def add_store():
-    store_id = input("Enter store ID: ")
+    store_id = str(uuid.uuid4())
     name = input("Enter store name: ")
-    item_id = input("Enter item ID: ")  # Changed to string
-    item_name = input("Enter item name: ")
 
     # Inserting into store documents
     store_document = {
         "Store_id": store_id,
         "Name": name,
-        "Item_id": item_id,
-        "Item_name": item_name
     }
 
     try:
@@ -104,7 +100,7 @@ def add_item():
 # Creating recipe documents
 def add_recipe():
     # Getting recipe inputs
-    recipe_id = input("Enter recipe ID: ")
+    recipe_id = str(uuid.uuid4())
     recipe_name = input("Enter recipe name: ")
     ingredients = input("Enter ingredients (comma-separated): ").split(",")
 
