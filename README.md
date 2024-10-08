@@ -7,23 +7,27 @@ Python 3.11 or higher
 MongoDB Atlas account (or a local MongoDB installation if you'd like)
 pip (Python package manager)
 
+## Schema
+
+## Why We Chose MongoDB Over SQL
+
 ## Setup
 1. Clone this repository or download the source code.
    
 3. Navigate to the project directory:
-   cd path/to/Chopnshop-database
+   `cd path/to/Chopnshop-database`
    
 5. Create a virtual environemnt if you'd like:
-   python -m venv .venv
+   `python -m venv .venv`
 
    On Windows:
-   .venv\Scripts\activate
+  ` .venv\Scripts\activate`
 
    On macOS and Linux:
-   source .venv/bin/activate
+  ` source .venv/bin/activate`
 
 6. Install the required packages:
-   pip install -r requirements.txt
+   `pip install -r requirements.txt`
 
 7. Create a .env file in the project root directory with your MongoDB connection string:
    MONGODB_URI='your_mongodb_connection_string_here'
@@ -32,4 +36,6 @@ pip (Python package manager)
 ## Usage
 To run the application:
 
-python main.py
+`python main.py`
+
+Add users, items, stores, and recipes.
