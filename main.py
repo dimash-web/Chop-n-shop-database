@@ -116,7 +116,7 @@ def add_recipe():
     }
 
     try:
-        result = recipes_collections.insert_one(recipe_document)
+        result = recipes_collection.insert_one(recipe_document)
         print(f"Item {recipe_name} added with ID: {result.inserted_id}")
     except pymongo.errors.PyMongoError as e:
         print(f"An error occurred while adding the recipe: {e}")
