@@ -8,7 +8,9 @@ import uuid
 load_dotenv()
 
 mongodb_uri = os.getenv("MONGO_URI")
-client = pymongo.MongoClient("mongodb_uri")
+
+client = pymongo.MongoClient(mongodb_uri)
+print(client)
 db = client["chop-n-shop"]
 users_collection = db["users"]
 stores_collection = db["stores"]
@@ -24,7 +26,7 @@ except Exception as e:
 
 #creating user documents
 def add_user():
-
+   
     #getting user inputs
     first_name = input("Enter first name: ")
     email = input("Enter email: ")
@@ -50,6 +52,8 @@ def add_user():
         print(f"User {first_name} added with ID: {result.inserted_id}")
     except pymongo.errors.PyMongoError as e:
         print(f"An error occurred while adding the user: {e}")
+    inserted_user = users_collection.find_one({"_id": result.inserted_id})
+    print(inserted_user)
 
 
 # Creating store documents
@@ -61,6 +65,7 @@ def add_store():
     store_document = {
         "Store_id": store_id,
         "Name": name,
+    
     }
 
     try:
@@ -112,7 +117,7 @@ def add_recipe():
     }
 
     try:
-        result = recipes_collection.insert_one(recipe_document)
+        result = recipes_collections.insert_one(recipe_document)
         print(f"Item {recipe_name} added with ID: {result.inserted_id}")
     except pymongo.errors.PyMongoError as e:
         print(f"An error occurred while adding the recipe: {e}")
@@ -127,7 +132,7 @@ def export_to_csv():
 
 
 def main():
-# 
+ 
     while True:
         print("\nChoose an option:")
         print("1. Add User")
