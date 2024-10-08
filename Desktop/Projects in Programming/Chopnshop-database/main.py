@@ -50,7 +50,27 @@ def add_user():
     except pymongo.errors.PyMongoError as e:
         print(f"An error occurred while adding the user: {e}")
 
-#creating store documents
+
+# Creating store documents
+def add_store():
+    store_id = input("Enter store ID: ")
+    name = input("Enter store name: ")
+    item_id = input("Enter item ID: ")  # Changed to string
+    item_name = input("Enter item name: ")
+
+    # Inserting into store documents
+    store_document = {
+        "Store_id": store_id,
+        "Name": name,
+        "Item_id": item_id,
+        "Item_name": item_name
+    }
+
+    try:
+        result = stores_collection.insert_one(store_document)  # Correct collection reference
+        print(f"Store {name} added with ID: {result.inserted_id}")
+    except pymongo.errors.PyMongoError as e:
+        print(f"An error occurred while adding the store: {e}")
 
 #creating item documents
 def add_item():
@@ -79,7 +99,9 @@ def add_item():
         print(f"Item {item_name} added with ID: {result.inserted_id}")
     except pymongo.errors.PyMongoError as e:
         print(f"An error occurred while adding the item: {e}")
-#creating recipe documents
+
+
+
 
 #using pandas to export sample user data from db
 def export_to_csv():
@@ -90,9 +112,12 @@ def export_to_csv():
 
 def main():
     add_user()
+    add_store()
     add_item()
+    add_recipe()
     export_to_csv()
     client.close()
 
 if __name__ == "__main__":
     main()
+
