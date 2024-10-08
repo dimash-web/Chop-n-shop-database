@@ -15,6 +15,7 @@ stores_collection = db["stores"]
 items_collection = db["items"]
 recipes_collection = db["recipes"]
 
+
 try:
     client.admin.command('ping')
     print("Pinged your deployment. You successfully connected to MongoDB!")
@@ -128,14 +129,37 @@ def export_to_csv():
 
     print("Sample data exported to CSV successfully.")
 
+
 def main():
-    add_user()
-    add_store()
-    add_item()
-    add_recipe()
-    export_to_csv()
+# 
+    while True:
+        print("\nChoose an option:")
+        print("1. Add User")
+        print("2. Add Store")
+        print("3. Add Item")
+        print("4. Add Recipe")
+        print("5. Export Users to CSV")
+        print("6. Exit")
+
+        choice = input("Enter your choice 1-6: ")
+
+        if choice == "1":
+            add_user()
+        elif choice == "2":
+            add_store()
+        elif choice == "3":
+            add_item()
+        elif choice == "4":
+            add_recipe()
+        elif choice == "5":
+            export_to_csv()
+        elif choice == "6":
+            client.close()
+            break
+        else:
+            print("Invalid choice. Please try again.")
     client.close()
+    print("Closed")
 
 if __name__ == "__main__":
     main()
-
