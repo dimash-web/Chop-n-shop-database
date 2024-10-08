@@ -1,11 +1,11 @@
 # Our Chop N' Shop Grocery database
 
-This is a simple command-line set-up of a database of grocery store prices and recipe-based ingredient suggestions. It allows users to obtain shopping lists based on the recipes they want to cook, their allergies and dietary restrictions, grocery store preferences and burget in a MongoDB database.
+This is a simple command-line set-up of a database of grocery store prices and recipe-based ingredient suggestions. It allows users to obtain shopping lists based on the recipes they want to cook, their allergies and dietary restrictions, grocery store preferences and budget in a MongoDB database.
 
 ## Prerequisites
-Python 3.11 or higher
-MongoDB Atlas account (or a local MongoDB installation if you'd like)
-pip (Python package manager)
+- Python 3.11 or higher
+- MongoDB Atlas account (or a local MongoDB installation if you'd like)
+- pip (Python package manager)
 
 ## Schema
 
@@ -24,13 +24,21 @@ We selected MongoDB for the Chop N' Shop application database for these reasons:
 9. Cloud Integration: By leveraging MongoDB Atlas, a cloud-based solution, we ensure our database is secure, scalable, and accessible. This allows us to focus on building and improving the application’s functionality without the overhead of database maintenance.
 
 ## Setup
-1. Clone this repository or download the source code.
+1. Clone this repository or download the source code:
+   ```
+   git clone https://github.com/dimash-web/chop-n-shop-database.git
+   cd chop-n-shop-database
+   ```
    
 3. Navigate to the project directory:
-   `cd path/to/Chopnshop-database`
+   ```
+   cd path/to/Chopnshop-database
+   ```
    
-5. Create a virtual environemnt if you'd like:
-   `python -m venv .venv`
+5. Create a virtual enviorment:
+   ```
+   python -m venv .venv
+   ```
 
    On Windows:
   ` .venv\Scripts\activate`
@@ -38,16 +46,27 @@ We selected MongoDB for the Chop N' Shop application database for these reasons:
    On macOS and Linux:
   ` source .venv/bin/activate`
 
-6. Install the required packages:
-   `pip install -r requirements.txt`
+7. Install the required packages:
+   ```
+   pip install -r requirements.txt
+   ```
 
-7. Create a .env file in the project root directory with your MongoDB connection string:
+9. Create a .env file in the project root directory with your MongoDB connection string:
+    ```
    MONGODB_URI='your_mongodb_connection_string_here'
-   Replace your_mongodb_connection_string_here with your actual MongoDB connection string from Atlas.
+    ```
+   Replace `your_mongodb_connection_string_here` with your actual MongoDB connection string from Atlas.
 
 ## Usage
 To run the application:
+```
+python main.py
+```
 
-`python main.py`
-
-Add users, items, stores, and recipes.
+Follow the on-screen instructions to add users, items, stores, and recipes:
+1. Add User
+2. Add Store
+3. Add Item
+4. Add Recipe
+5. Export Users to CSV
+6. Exit
