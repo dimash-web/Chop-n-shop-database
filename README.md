@@ -11,6 +11,18 @@ pip (Python package manager)
 
 ## Why We Chose MongoDB Over SQL
 
+We selected MongoDB for the Chop N' Shop application database for these reasons:
+
+1. Ease of Use: MongoDB’s flexible query language and support for various data types simplify data retrieval and manipulation. This helps streamline our development process, allowing us to focus on core features like generating recipe-based shopping lists, accommodating dietary restrictions, and managing grocery store preferences.
+
+3. Learning Opportunity: While our team has experience with SQL, we saw this as a chance to expand our skills by learning MongoDB. We’re confident that this shift will not slow down feature implementation, but rather give us the opportunity to explore new capabilities that MongoDB offers.
+  
+5. Schema Flexibility: MongoDB’s document-based structure allows us to handle dynamic and varying data formats naturally. This is particularly useful for storing data such as user preferences, grocery store details, recipe ingredients, and allergen information, all of which can vary greatly in structure.
+ 
+7. Performance: MongoDB is well-suited to handle the large volumes of data our application will generate, such as managing multiple users, recipes, and store inventories, with high read and write operations. This ensures fast performance compared to traditional SQL databases.
+
+9. Cloud Integration: By leveraging MongoDB Atlas, a cloud-based solution, we ensure our database is secure, scalable, and accessible. This allows us to focus on building and improving the application’s functionality without the overhead of database maintenance.
+
 ## Setup
 1. Clone this repository or download the source code.
    
