@@ -1,12 +1,14 @@
 import os
 from dotenv import load_dotenv
 import pymongo
+import pandas as pd
+import uuid
 
 #setting up MongoDB and collections
 load_dotenv()
 
 mongodb_uri = os.getenv("MONGO_URI")
-client = pymongo.MongoClient(mongodb_uri)
+client = pymongo.MongoClient("mongodb_uri")
 db = client["chop-n-shop"]
 users_collection = db["users"]
 stores_collection = db["stores"]
@@ -52,16 +54,16 @@ def add_user():
 
 #creating item documents
 def add_item():
-    # Getting item inputs
-    item_id = input("Enter item ID: ")
-    item_name = input("Enter item name: ")
-    store_id = input("Enter store ID: ")
-    store_name = input("Enter store name: ")
-    price = float(input("Enter price: "))
-    ingredients = input("Enter ingredients (comma-separated): ").split(",")
-    calories = int(input("Enter calories: "))
+    #creating placeholder variables for now - to be scraped 
+    item_id = str(uuid.uuid4())
+    item_name = "Cheesecake"
+    store_id = store['store_id']
+    store_name = store['store_name']
+    price = 6.99
+    ingredients = ["cheese", "milk", "flour", "sugar"]
+    calories = 360
     
-    # Inserting into item documents
+    #creating item documents - to be scraped from stores 
     item_document = {
         "Item_id": item_id,
         "Item_name": item_name,
@@ -79,9 +81,17 @@ def add_item():
         print(f"An error occurred while adding the item: {e}")
 #creating recipe documents
 
+#using pandas to export sample user data from db
+def export_to_csv():
+    users = list(users_collection.find())
+    pd.DataFrame(users).to_csv('users_sample_data.csv', index=False)
+
+    print("Sample data exported to CSV successfully.")
+
 def main():
     add_user()
     add_item()
+    export_to_csv()
     client.close()
 
 if __name__ == "__main__":
