@@ -8,7 +8,7 @@ import uuid
 load_dotenv()
 
 mongodb_uri = os.getenv("MONGO_URI")
-client = pymongo.MongoClient(mongodb_uri)
+client = pymongo.MongoClient("mongodb_uri")
 db = client["chop-n-shop"]
 users_collection = db["users"]
 stores_collection = db["stores"]
@@ -24,7 +24,7 @@ except Exception as e:
 
 #creating user documents
 def add_user():
-
+   
     #getting user inputs
     first_name = input("Enter first name: ")
     email = input("Enter email: ")
@@ -50,6 +50,8 @@ def add_user():
         print(f"User {first_name} added with ID: {result.inserted_id}")
     except pymongo.errors.PyMongoError as e:
         print(f"An error occurred while adding the user: {e}")
+    inserted_user = users_collection.find_one({"_id": result.inserted_id})
+    print(inserted_user)
 
 
 # Creating store documents
@@ -61,6 +63,8 @@ def add_store():
     store_document = {
         "Store_id": store_id,
         "Name": name,
+        "Item_id": item_id,
+        "Item_name": item_name
     }
 
     try:
@@ -71,16 +75,16 @@ def add_store():
 
 #creating item documents
 def add_item():
-    #creating placeholder variables for now - to be scraped 
-    item_id = str(uuid.uuid4())
-    item_name = "Cheesecake"
-    store_id = store['store_id']
-    store_name = store['store_name']
-    price = 6.99
-    ingredients = ["cheese", "milk", "flour", "sugar"]
-    calories = 360
     
-    #creating item documents - to be scraped from stores 
+    item_id = str(uuid.uuid4())
+    item_name = input("Enter item name: ")
+    store_id = input("Enter store ID: ")
+    store_name = input("Enter store name: ")
+    price = input("Enter item price: ")
+    ingredients = input("Enter ingredients (comma-separated): ").split(",")
+    calories = input("Enter calories: ")
+    
+    
     item_document = {
         "Item_id": item_id,
         "Item_name": item_name,
@@ -127,7 +131,7 @@ def export_to_csv():
 
 
 def main():
-# 
+ 
     while True:
         print("\nChoose an option:")
         print("1. Add User")
