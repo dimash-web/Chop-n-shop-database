@@ -8,7 +8,7 @@ import uuid
 load_dotenv()
 
 mongodb_uri = os.getenv("MONGO_URI")
-client = pymongo.MongoClient("mongodb_uri")
+client = pymongo.MongoClient(mongodb_uri)
 db = client["chop-n-shop"]
 users_collection = db["users"]
 stores_collection = db["stores"]
