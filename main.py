@@ -7,7 +7,8 @@ import uuid
 #setting up MongoDB and collections
 load_dotenv()
 
-mongodb_uri = os.getenv("MONGO_URI")
+mongodb_uri = os.getenv("MONGODB_URI")
+print(mongodb_uri)
 client = pymongo.MongoClient(mongodb_uri)
 
 db = client["chop-n-shop"]

@@ -15,11 +15,18 @@ class Item(BaseModel):
     Ingredients: list[str]
     Calories: int
 
+@app.get("/")
+async def read_root():
+    return {"message": "Welcome to the Chop-n-Shop API!"}
+
+
 #get (view) all items 
 @app.get("/items/")
 async def get_items():
     items = list(items_collection.find({}, {"_id": 0}))
+    print(items) 
     return items
+
 
 #get (view) an item (by id)
 @app.get("/items/{item_id}")
