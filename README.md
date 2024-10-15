@@ -1,8 +1,8 @@
 # Chop N' Shop Week 6: API
 
-We used **FastAPI** and **MongoDB** to create an API for managing a list of grocery items. This API allows you to create, view, update, and delete items in a database. Each item includes a name, name of the store it's from, price, applicable ingredients, and a calorie count.
+We used **FastAPI** and **MongoDB** to create an API for managing a list of grocery items. This API allows you to create, view, update, and delete **items** in a database. Each item includes a name, its store, price, applicable ingredients, and a calorie count.
 
-## Setting up and running instructions
+## Setting Up & Running Instructions
 
 ### 1. Setting up database
 - Clone this repository or download the source code:
@@ -42,26 +42,28 @@ This should give you access to our MongoDB database which has some sample data c
 
 ### 2. Running the API
 - Run the FastAPI server
+  ```
   uvicorn api:app --reload
+  ```
   
 - The API docs for testing are available at:
   http://127.0.0.1:8000/docs
   or http://localhost:8000/docs
 
-### 3. Use Postman to interact with the API
+### 3. Using Postman to interact with the API
 
-You can use our API in your Postman app. Here are some examples of how it can work with a few /items/ endpoints.
+You can use our API in your Postman. Here are some examples of how it can work with a few /items/ endpoints.
 
-1. Get All Items
-- GET /items/
+**1. Get All Items**
+- GET `/items/`
 
-2. Get a Single Item by ID
-- GET /items/{item_id}
+**2. Get a Single Item by ID**
+- GET `/items/{item_id}`
   
-3. Add a New Item
-- POST /items/
+**3. Add a New Item**
+- POST `/items/`
 - Example Request Body:
-
+```
 {
 "Item_name": "Apple",
 "Store_name": "Fresh Market",
@@ -69,24 +71,26 @@ You can use our API in your Postman app. Here are some examples of how it can wo
 "Ingredients": ["Apple"],
 "Calories": 52
 }
+```
   
-4. Update an Existing Item
-- PUT /items/{item_id}
+**4. Update an Existing Item**
+- PUT `/items/{item_id}`
 - Example Request Body:
-
+```
 {
   "Item_name": "Banana",
   "Store_name": "Green Grocer",
   "Price": 0.79,
   "Ingredients": ["Banana"],
   "Calories": 89
-  }
+}
+```
  
-5. Delete an Item
-- DELETE /items/{item_id}
+**5. Delete an Item**
+- DELETE `/items/{item_id}`
 
 
-## Our Grocery Database: Week 5
+## Our Grocery Database: Database Setup
 
 This is a simple command-line set-up of a database of grocery store prices and recipe-based ingredient suggestions. It allows users to obtain shopping lists based on the recipes they want to cook, their allergies and dietary restrictions, grocery store preferences and budget in a MongoDB database.
 
