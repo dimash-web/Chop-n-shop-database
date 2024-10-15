@@ -24,18 +24,18 @@ async def read_root():
 @app.get("/items/")
 async def get_items():
     items = list(items_collection.find({}, {"_id": 0}))
-    print(items) 
     return items
 
 
 #get (view) an item (by id)
 @app.get("/items/{item_id}")
 async def get_item(item_id: str):
-    item = items_collection.find_one({"_id": ObjectId(item_id)})
+    item = items_collection.find_one({"Item_id": item_id})
     if item:
         item["_id"] = str(item["_id"])  
         return item
     raise HTTPException(status_code=404, detail="Item not found")
+
 
 #post (create) a new item
 @app.post("/items/")
