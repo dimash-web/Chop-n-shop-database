@@ -90,7 +90,7 @@ You can use our API in your Postman. Here are some examples of how it can work w
 - DELETE `/items/{item_id}`
 
 
-## Our Grocery Database: Database Setup
+# Our Grocery Database: Database Setup
 
 This is a simple command-line set-up of a database of grocery store prices and recipe-based ingredient suggestions. It allows users to obtain shopping lists based on the recipes they want to cook, their allergies and dietary restrictions, grocery store preferences and budget in a MongoDB database.
 
