@@ -61,24 +61,26 @@ You can use our API in your Postman app. Here are some examples of how it can wo
 3. Add a New Item
 - POST /items/
 - Example Request Body:
+
 {
-  "Item_name": "Apple",
-  "Store_name": "Fresh Market",
-  "Price": 0.99,
-  "Ingredients": ["Apple"],
-  "Calories": 52
+"Item_name": "Apple",
+"Store_name": "Fresh Market",
+"Price": 0.99,
+"Ingredients": ["Apple"],
+"Calories": 52
 }
   
 4. Update an Existing Item
 - PUT /items/{item_id}
 - Example Request Body:
+
 {
   "Item_name": "Banana",
   "Store_name": "Green Grocer",
   "Price": 0.79,
   "Ingredients": ["Banana"],
   "Calories": 89
-}
+  }
  
 5. Delete an Item
 - DELETE /items/{item_id}
