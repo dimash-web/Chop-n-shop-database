@@ -11,11 +11,6 @@ We used **FastAPI** and **MongoDB** to create an API for managing a list of groc
   cd chop-n-shop-database
   ```
   
-- Navigate to the project directory:
-  ```
-  cd path/to/Chopnshop-database
-  ```
-  
 - Create a virtual enviorment:
   ```
   python -m venv .venv
