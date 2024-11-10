@@ -1,13 +1,13 @@
 from fastapi import FastAPI, HTTPException
-from main import items_collection
+from main import users_collection, items_collection
+from openai_service import generate_grocery_list  # Import the OpenAI function
 from pydantic import BaseModel
 from bson import ObjectId
 import uuid
 
 app = FastAPI()
 
-# run 'uvicorn api:app --reload' to test 
-
+# Define Item model
 class Item(BaseModel):
     Item_name: str
     Store_name: str
@@ -15,29 +15,22 @@ class Item(BaseModel):
     Ingredients: list[str]
     Calories: int
 
-@app.get("/")
-async def read_root():
-    return {"message": "Welcome to the Chop-n-Shop API!"}
-
-
-#get (view) all items 
+# Endpoint to get all items
 @app.get("/items/")
 async def get_items():
     items = list(items_collection.find({}, {"_id": 0}))
     return items
 
-
-#get (view) an item (by id)
+# Endpoint to get a specific item by ID
 @app.get("/items/{item_id}")
 async def get_item(item_id: str):
-    item = items_collection.find_one({"Item_id": item_id})
+    item = items_collection.find_one({"_id": ObjectId(item_id)})
     if item:
         item["_id"] = str(item["_id"])  
         return item
     raise HTTPException(status_code=404, detail="Item not found")
 
-
-#post (create) a new item
+# Endpoint to create a new item
 @app.post("/items/")
 async def create_item(item: Item):
     item_document = item.dict()
@@ -45,7 +38,7 @@ async def create_item(item: Item):
     items_collection.insert_one(item_document)
     return {"message": "Item created successfully", "Item_id": item_document["Item_id"]}
 
-#put (update) an item
+# Endpoint to update an item by ID
 @app.put("/items/{item_id}")
 async def update_item(item_id: str, item: Item):
     update_result = items_collection.update_one({"_id": ObjectId(item_id)}, {"$set": item.dict()})
@@ -53,10 +46,31 @@ async def update_item(item_id: str, item: Item):
         return {"message": "Item updated successfully"}
     raise HTTPException(status_code=404, detail="Item not found")
 
-#delete an item
+# Endpoint to delete an item by ID
 @app.delete("/items/{item_id}")
 async def delete_item(item_id: str):
     delete_result = items_collection.delete_one({"_id": ObjectId(item_id)})
     if delete_result.deleted_count == 1:
         return {"message": "Item deleted successfully"}
     raise HTTPException(status_code=404, detail="Item not found")
+
+# Endpoint to generate a grocery list based on user preferences
+@app.post("/generate_grocery_list/")
+async def generate_grocery_list_endpoint(user_id: str):
+    user = users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Prepare user preferences to pass to the OpenAI function
+    user_preferences = {
+        "Budget": user["Budget"],
+        "Dietary_restrictions": user["Dietary_restrictions"],
+        "Allergies": user["Allergies"],
+        "Food_request": user["Food_request"],
+        "Preferred_stores": user["Preferred_stores"]
+    }
+
+    # Generate grocery list using the OpenAI API
+    grocery_list = generate_grocery_list(user_preferences)
+    
+    return {"grocery_list": grocery_list}
