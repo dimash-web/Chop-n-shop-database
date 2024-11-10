@@ -1,13 +1,13 @@
 from fastapi import FastAPI, HTTPException
-from main import users_collection, items_collection
-from openai_service import generate_grocery_list  # Import the OpenAI function
+from main import users_collection, stores_collection, items_collection
+from openai_service import generate_grocery_list  #importing the open ai function
 from pydantic import BaseModel
 from bson import ObjectId
 import uuid
 
 app = FastAPI()
 
-# Define Item model
+# define the pydantic models for input validation
 class Item(BaseModel):
     Item_name: str
     Store_name: str
@@ -15,13 +15,25 @@ class Item(BaseModel):
     Ingredients: list[str]
     Calories: int
 
-# Endpoint to get all items
+class User(BaseModel):
+    first_name: str
+    email: str
+    budget: float
+    dietary_restrictions: str
+    allergies: str
+    food_request: str
+    preferred_stores: str
+
+class Store(BaseModel):
+    name: str
+
+# endpoint to get all items
 @app.get("/items/")
 async def get_items():
     items = list(items_collection.find({}, {"_id": 0}))
     return items
 
-# Endpoint to get a specific item by ID
+# endpoint to get a specific item by ID
 @app.get("/items/{item_id}")
 async def get_item(item_id: str):
     item = items_collection.find_one({"_id": ObjectId(item_id)})
@@ -30,7 +42,7 @@ async def get_item(item_id: str):
         return item
     raise HTTPException(status_code=404, detail="Item not found")
 
-# Endpoint to create a new item
+# endpoint to create a new item
 @app.post("/items/")
 async def create_item(item: Item):
     item_document = item.dict()
@@ -38,7 +50,7 @@ async def create_item(item: Item):
     items_collection.insert_one(item_document)
     return {"message": "Item created successfully", "Item_id": item_document["Item_id"]}
 
-# Endpoint to update an item by ID
+# endpoint to update an item by ID
 @app.put("/items/{item_id}")
 async def update_item(item_id: str, item: Item):
     update_result = items_collection.update_one({"_id": ObjectId(item_id)}, {"$set": item.dict()})
@@ -46,7 +58,7 @@ async def update_item(item_id: str, item: Item):
         return {"message": "Item updated successfully"}
     raise HTTPException(status_code=404, detail="Item not found")
 
-# Endpoint to delete an item by ID
+# endpoint to delete an item by ID
 @app.delete("/items/{item_id}")
 async def delete_item(item_id: str):
     delete_result = items_collection.delete_one({"_id": ObjectId(item_id)})
@@ -54,14 +66,14 @@ async def delete_item(item_id: str):
         return {"message": "Item deleted successfully"}
     raise HTTPException(status_code=404, detail="Item not found")
 
-# Endpoint to generate a grocery list based on user preferences
+# endpoint to generate a grocery list based on user preferences
 @app.post("/generate_grocery_list/")
 async def generate_grocery_list_endpoint(user_id: str):
     user = users_collection.find_one({"_id": ObjectId(user_id)})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Prepare user preferences to pass to the OpenAI function
+    # prepare user preferences to pass to the OpenAI function
     user_preferences = {
         "Budget": user["Budget"],
         "Dietary_restrictions": user["Dietary_restrictions"],
@@ -74,3 +86,42 @@ async def generate_grocery_list_endpoint(user_id: str):
     grocery_list = generate_grocery_list(user_preferences)
     
     return {"grocery_list": grocery_list}
+
+# endpoint to add user to the database
+@app.post("/add_user/")
+async def add_user(user: User):
+    dietary_restrictions = [] if user.dietary_restrictions.lower() == "none" else user.dietary_restrictions.split(",")
+    allergies = [] if user.allergies.lower() == "none" else user.allergies.split(",")
+    food_request = user.food_request.split(",")
+    preferred_stores = [] if user.preferred_stores.lower() == "none" else user.preferred_stores.split(",")
+
+    user_document = {
+        "First_name": user.first_name,
+        "Email": user.email,
+        "Budget": user.budget,
+        "Dietary_restrictions": dietary_restrictions,
+        "Allergies": allergies,
+        "Food_request": food_request,
+        "Preferred_stores": preferred_stores,
+    }
+
+    try:
+        result = users_collection.insert_one(user_document)
+        return {"message": f"User {user.first_name} added with ID: {result.inserted_id}"}
+    except Exception as e:
+        return {"error": f"An error occurred while adding the user: {str(e)}"}
+
+# endpoint to add a store to the database
+@app.post("/add_store/")
+async def add_store(store: Store):
+    store_id = str(uuid.uuid4())
+    store_document = {
+        "Store_id": store_id,
+        "Name": store.name
+    }
+
+    try:
+        result = stores_collection.insert_one(store_document)
+        return {"message": f"Store {store.name} added with ID: {result.inserted_id}"}
+    except Exception as e:
+        return {"error": f"An error occurred while adding the store: {str(e)}"}
