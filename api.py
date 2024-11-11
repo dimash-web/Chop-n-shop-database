@@ -89,7 +89,7 @@ async def delete_item(item_id: str):
 #     return {"grocery_list": grocery_list}
 
 # endpoint to add user to the database
-@app.post("/add_user/")
+@app.post("/register/")
 async def add_user(user: User):
     dietary_restrictions = [] if not user.dietary_restrictions or user.dietary_restrictions.lower() == "none" else user.dietary_restrictions.split(",")
     allergies = [] if not user.allergies or user.allergies.lower() == "none" else user.allergies.split(",")
