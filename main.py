@@ -27,6 +27,7 @@ def add_user():
     # Getting user inputs
     first_name = input("Enter first name: ")
     email = input("Enter email: ")
+    password = input("Enter password: ")
     budget = float(input("Enter budget: "))
     dietary_restrictions = input("Enter dietary restrictions (comma-separated) or 'none' if none: ")
     allergies = input("Enter allergies (comma-separated) or 'none' if none: ")
@@ -37,6 +38,7 @@ def add_user():
     user_document = {
         "First_name": first_name,
         "Email": email,
+        "Password": password,
         "Budget": budget,
         "Dietary_restrictions": [] if dietary_restrictions.lower() == "none" else [dr.strip() for dr in dietary_restrictions.split(",")],
         "Allergies": [] if allergies.lower() == "none" else [a.strip() for a in allergies.split(",")],

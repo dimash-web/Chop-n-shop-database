@@ -18,6 +18,7 @@ class Item(BaseModel):
 class User(BaseModel):
     first_name: str
     email: str
+    password: str
     budget: float
     dietary_restrictions: str
     allergies: str
@@ -90,19 +91,20 @@ async def delete_item(item_id: str):
 # endpoint to add user to the database
 @app.post("/add_user/")
 async def add_user(user: User):
-    dietary_restrictions = [] if user.dietary_restrictions.lower() == "none" else user.dietary_restrictions.split(",")
-    allergies = [] if user.allergies.lower() == "none" else user.allergies.split(",")
-    food_request = user.food_request.split(",")
-    preferred_stores = [] if user.preferred_stores.lower() == "none" else user.preferred_stores.split(",")
+    dietary_restrictions = [] if not user.dietary_restrictions or user.dietary_restrictions.lower() == "none" else user.dietary_restrictions.split(",")
+    allergies = [] if not user.allergies or user.allergies.lower() == "none" else user.allergies.split(",")
+    food_request = [] if not user.food_request or user.food_request.lower() == "none" else user.food_request.split(",")
+    preferred_stores = [] if not user.preferred_stores or user.preferred_stores.lower() == "none" else user.preferred_stores.split(",")
 
     user_document = {
-        "First_name": user.first_name,
-        "Email": user.email,
-        "Budget": user.budget,
-        "Dietary_restrictions": dietary_restrictions,
-        "Allergies": allergies,
-        "Food_request": food_request,
-        "Preferred_stores": preferred_stores,
+        "first_name": user.first_name,
+        "email": user.email,
+        "password": user.password,
+        "budget": user.budget,
+        "dietary_restrictions": dietary_restrictions,
+        "allergies": allergies,
+        "food_request": food_request,
+        "preferred_stores": preferred_stores,
     }
 
     try:
@@ -111,8 +113,16 @@ async def add_user(user: User):
     except Exception as e:
         return {"error": f"An error occurred while adding the user: {str(e)}"}
 
-# retrieving the user data
+# retrieving the users
+@app.get("/users/")
+async def get_users():
+    users = list(users_collection.find({}))
+    for user in users:
+        user["_id"] = str(user["_id"]) 
+    return users
 
+
+# retrieving the user data by id 
 @app.get("/users/{user_id}")
 async def get_user(user_id: str):
     user = users_collection.find_one({"_id": ObjectId(user_id)})
