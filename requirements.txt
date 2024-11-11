@@ -2,4 +2,4 @@ pymongo
 python-dotenv
 pandas
 uuid
-"fastapi[standard]"
+fastapi[standard]
