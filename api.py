@@ -28,6 +28,13 @@ class User(BaseModel):
 class Store(BaseModel):
     name: str
 
+# Model for grocery list items
+class GroceryItem(BaseModel):
+    item_name: str
+    quantity: int
+    store_name: str = None  # Optional field for preferred store
+
+
 # endpoint to get all items
 @app.get("/items/")
 async def get_items():
@@ -145,3 +152,56 @@ async def add_store(store: Store):
         return {"message": f"Store {store.name} added with ID: {result.inserted_id}"}
     except Exception as e:
         return {"error": f"An error occurred while adding the store: {str(e)}"}
+
+
+
+# Endpoint to add items to a user's grocery list
+@app.post("/users/{user_id}/grocery-list/")
+async def add_grocery_item(user_id: str, item: GroceryItem):
+    # Find user by ID
+    user = users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Create item document with a unique ID
+    grocery_item = {
+        "item_id": str(uuid.uuid4()),
+        "item_name": item.item_name,
+        "quantity": item.quantity,
+        "store_name": item.store_name
+    }
+
+    # Update user's document to add the item to grocery list array
+    users_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$push": {"grocery_list": grocery_item}}
+    )
+
+    return {"message": "Grocery item added successfully", "grocery_item": grocery_item}
+
+# Endpoint to retrieve the grocery list for a user
+@app.get("/users/{user_id}/grocery-list/")
+async def get_grocery_list(user_id: str):
+    user = users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return user.get("grocery_list", [])
+
+
+# Optional: Endpoint to delete a grocery item from the list
+@app.delete("/users/{user_id}/grocery-list/{item_id}")
+async def delete_grocery_item(user_id: str, item_id: str):
+    user = users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    update_result = users_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$pull": {"grocery_list": {"item_id": item_id}}}
+    )
+
+    if update_result.modified_count == 1:
+        return {"message": "Grocery item deleted successfully"}
+    else:
+        raise HTTPException(status_code=404, detail="Grocery item not found")
