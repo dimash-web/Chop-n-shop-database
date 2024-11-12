@@ -1,3 +1,89 @@
+# Chop N' Shop Week 9: Full Stack
+This is prototype fullstack application for Chop N' Shop, our grocery shopping assistant. We integrated several of our **FastAPI** endpoints with our **MongoDB** database and Frontend components. This prototype will allow you to register a new user, authenticate an existing user, and update or add a grocery list.
+
+## Setting Up & Running Instructions
+### Backend Setup
+#### 1. Clone the Backend Repository
+  ```
+    git clone https://github.com/dimash-web/chop-n-shop-database.git
+    cd chop-n-shop-database
+  ```
+#### 2. Set Up a Virtual Environment
+  ```
+    python -m venv .venv
+  ```
+
+  - On Windows:
+  ` .venv\Scripts\activate`
+
+  - On macOS and Linux:
+  ` source .venv/bin/activate`
+
+#### 3. Install Required Packages
+
+```
+  pip install -r requirements.txt
+  ```
+#### 4. Set Up Environment Variables
+Create a .env file in the project root directory with your MongoDB connection string:
+  ```
+  MONGODB_URI='your_mongodb_connection_string_here'
+  ```
+  Replace `your_mongodb_connection_string_here` with your actual MongoDB connection string from Atlas. This should give you access to our MongoDB database.
+
+#### 5. Run the Backend
+Run the FastAPI server
+  ```
+  uvicorn api:app --reload
+  ```
+  
+The API docs for testing are available at:
+  http://127.0.0.1:8000/docs
+  or http://localhost:8000/docs
+
+### Frontend Setup
+#### 1. Clone the Frontend Repository
+```
+https://github.com/Sreya-Mandalika/chop-n-shop-frontend.git
+cd chop-n-shop-frontend
+```
+#### 2. Install Frontend Dependencies
+Navigate to the project directory and install the necessary dependencies using npm:
+```
+npm install
+npm install react@latest react-dom@latest
+npm install lucide-react
+npm install -D tailwindcss postcss autoprefixer
+npm install @radix-ui/react-icons class-variance-authority clsx tailwindcss-animate @shadcn/ui
+```
+#### 3. Run the Frontend
+```
+npm start
+```
+This will start the React development server and the frontend will be available at http://localhost:3000.
+
+## Current API Endpoints
+### User Endpoints:
+- `POST /register/`: registers a new user by adding them to the database.
+- `POST /login/`: authenticates a user by checking their email and password.
+- `GET /users/`: retrieves all users from the database.
+- `GET /users/{user_id}`: retrieves a specific user by their ID.
+
+### Grocery List Endpoints:
+- `POST /users/{user_id}/grocery-list/`: adds an item to a user's grocery list.
+- `GET /users/{user_id}/grocery-list/`: retrieves the grocery list for a specific user.
+- `DELETE /users/{user_id}/grocery-list/{item_id}`: deletes a specific grocery item from a user's grocery list.
+
+### Items Endpoints:
+- `GET /items/`: retrieves all items from the database.
+- `GET /items/{item_id}`: retrieves a specific item by its ID.
+- `POST /items/`: creates a new item in the database.
+- `PUT /items/{item_id}`: updates an existing item by its ID.
+- `DELETE /items/{item_id}`: deletes an item by its ID.
+
+## Low Fidelity Wireframe 
+
+
 # Chop N' Shop Week 6: API
 
 We used **FastAPI** and **MongoDB** to create an API for managing a list of grocery items. This API allows you to create, view, update, and delete **items** in a database. Each item includes a name, its store, price, applicable ingredients, and a calorie count.
