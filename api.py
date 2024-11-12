@@ -35,11 +35,15 @@ class User(BaseModel):
     first_name: str
     email: str
     password: str
+<<<<<<< HEAD
     budget: float
     dietary_restrictions: str
     allergies: list[str]
     food_request: list[str]
     preferred_stores: list[str]
+=======
+    allergies: str
+>>>>>>> b87df3d (Minor change)
 
 class Store(BaseModel):
     name: str
@@ -128,20 +132,19 @@ async def delete_item(item_id: str):
 # endpoint to add user to the database
 @app.post("/register/")
 async def add_user(user: User):
-    dietary_restrictions = [] if not user.dietary_restrictions or user.dietary_restrictions.lower() == "none" else user.dietary_restrictions.split(",")
+    # dietary_restrictions = [] if not user.dietary_restrictions or user.dietary_restrictions.lower() == "none" else user.dietary_restrictions.split(",")
     allergies = [] if not user.allergies or user.allergies.lower() == "none" else user.allergies.split(",")
-    food_request = [] if not user.food_request or user.food_request.lower() == "none" else user.food_request.split(",")
-    preferred_stores = [] if not user.preferred_stores or user.preferred_stores.lower() == "none" else user.preferred_stores.split(",")
+    # food_request = [] if not user.food_request or user.food_request.lower() == "none" else user.food_request.split(",")
+    # preferred_stores = [] if not user.preferred_stores or user.preferred_stores.lower() == "none" else user.preferred_stores.split(",")
 
     user_document = {
         "first_name": user.first_name,
         "email": user.email,
         "password": user.password,
-        "budget": user.budget,
-        "dietary_restrictions": dietary_restrictions,
+        # "dietary_restrictions": dietary_restrictions,
         "allergies": allergies,
-        "food_request": food_request,
-        "preferred_stores": preferred_stores,
+        # "food_request": food_request,
+        # "preferred_stores": preferred_stores,
     }
 
     try:
