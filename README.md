@@ -41,29 +41,8 @@ The API docs for testing are available at:
   http://127.0.0.1:8000/docs
   or http://localhost:8000/docs
 
-### Frontend Setup
-#### 1. Clone the Frontend Repository
-```
-https://github.com/Sreya-Mandalika/chop-n-shop-frontend.git
-cd chop-n-shop-frontend
-```
-#### 2. Install Frontend Dependencies
-Navigate to the project directory and install the necessary dependencies using npm:
-```
-npm install
-npm install react@18.2.0 react-dom@18.2.0 react-router-dom@6.14.0
-npm install lucide-react
-npm install -D tailwindcss postcss autoprefixer
-npm install @radix-ui/react-icons class-variance-authority clsx tailwindcss-animate @shadcn/ui
-```
-#### 3. Run the Frontend
-```
-npm start
-```
-This will start the React development server and the frontend will be available at http://localhost:3000.
-
 ## Current API Endpoints
-### User Endpoints:
+### User Endpoints (Testable):
 - `POST /register/`: registers a new user by adding them to the database.
 - `POST /login/`: authenticates a user by checking their email and password.
 - `GET /users/`: retrieves all users from the database.
@@ -73,6 +52,9 @@ This will start the React development server and the frontend will be available 
 - `POST /users/{user_id}/grocery-list/`: adds an item to a user's grocery list.
 - `GET /users/{user_id}/grocery-list/`: retrieves the grocery list for a specific user.
 - `DELETE /users/{user_id}/grocery-list/{item_id}`: deletes a specific grocery item from a user's grocery list.
+
+### Recipe Endpoint (Testable):
+- `GET /recipes/{recipe_name}`: retrieves a specific recipe by name.
 
 ### Items Endpoints:
 - `GET /items/`: retrieves all items from the database.
