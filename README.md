@@ -42,7 +42,7 @@ The API docs for testing are available at:
   or http://localhost:8000/docs
 
 ## Current API Endpoints
-### User Endpoints:
+### User Endpoints (Testable):
 - `POST /register/`: registers a new user by adding them to the database.
 - `POST /login/`: authenticates a user by checking their email and password.
 - `GET /users/`: retrieves all users from the database.
@@ -52,6 +52,9 @@ The API docs for testing are available at:
 - `POST /users/{user_id}/grocery-list/`: adds an item to a user's grocery list.
 - `GET /users/{user_id}/grocery-list/`: retrieves the grocery list for a specific user.
 - `DELETE /users/{user_id}/grocery-list/{item_id}`: deletes a specific grocery item from a user's grocery list.
+
+### Recipe Endpoint (Testable):
+- `GET /recipes/{recipe_name}`: retrieves a specific recipe by name.
 
 ### Items Endpoints:
 - `GET /items/`: retrieves all items from the database.
