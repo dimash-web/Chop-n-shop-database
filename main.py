@@ -54,13 +54,113 @@ def add_user():
     except pymongo.errors.PyMongoError as e:
         print(f"An error occurred while adding the user: {e}")
 
-# Creating a grocery list document without needing user_id explicitly
-def create_grocery_list():
-    # Fetch user data based on email
-    email = input("Enter the user's email to create a grocery list: ")
-    user = users_collection.find_one({"Email": email})
+# Creating store documents
+def add_store():
+    store_id = str(uuid.uuid4())
+    name = input("Enter store name: ")
+
+    # Inserting into store documents
+    store_document = {
+        "Store_id": store_id,
+        "Name": name
+    }
+
+    try:
+        result = stores_collection.insert_one(store_document)
+        print(f"Store {name} added with ID: {result.inserted_id}")
+    except pymongo.errors.PyMongoError as e:
+        print(f"An error occurred while adding the store: {e}")
+
+# Creating item documents from CSV
+def upload_csv_to_items(file_path, store_name):
+    # Load the CSV into a DataFrame
+    df = pd.read_csv(file_path)
+
+    # Rename 'Ounces' column to 'Amount'
+    df.rename(columns={'Ounces': 'Amount'}, inplace=True)
+
+    # Retrieve store info from the `stores` collection based on the store_name
+    store = stores_collection.find_one({"Name": store_name})
+    if not store:
+        print(f"Store '{store_name}' not found in the database.")
+        return
+
+    store_id = store["Store_id"]  # Use the store's existing ID
+
+    # Insert each row as a document in the `items` collection
+    for _, row in df.iterrows():
+        item_document = {
+            "Item_id": str(uuid.uuid4()),  # Generate unique ID for each item
+            "Item_name": row['Product'],
+            "Store_id": store_id,
+            "Store_name": store_name,
+            "Price": row['Price'],
+            "Amount": row['Amount'],  # Use 'Amount' instead of 'Ounces'
+            "Serving_Size": row['Serving Size'],
+            "Calories": row['Calories'],
+            "Ingredients": row['Ingredients'].split(","),
+            "Allergens": row['Allergens'].split(",") if pd.notna(row['Allergens']) else []
+        }
+
+        try:
+            result = items_collection.insert_one(item_document)
+            print(f"Item {row['Product']} added with ID: {result.inserted_id}")
+        except pymongo.errors.PyMongoError as e:
+            print(f"An error occurred while adding the item: {e}")
+
+# Creating recipe documents
+def add_recipe():
+    # Getting recipe inputs
+    recipe_id = str(uuid.uuid4())
+    recipe_name = input("Enter recipe name: ")
+    ingredients = input("Enter ingredients (comma-separated): ").split(",")
+    
+    # Inserting into recipe documents
+    recipe_document = {
+        "Recipe_id": recipe_id,
+        "Recipe_name": recipe_name,
+        "Ingredients": [i.strip() for i in ingredients]
+    }
+
+    try:
+        result = recipes_collection.insert_one(recipe_document)
+        print(f"Recipe {recipe_name} added with ID: {result.inserted_id}")
+    except pymongo.errors.PyMongoError as e:
+        print(f"An error occurred while adding the recipe: {e}")
+
+# Function to fix price field in existing items (convert string to float)
+def update_prices_in_items():
+    items = items_collection.find({"Price": {"$type": "string"}})  # Only items where Price is a string
+
+    for item in items:
+        try:
+            # Clean the 'Price' field to remove any non-numeric characters (like '$')
+            cleaned_price = item['Price'].replace('$', '').replace(',', '').strip()
+            
+            # Convert cleaned price to float
+            updated_price = float(cleaned_price)
+            
+            # Update the item with the new price as a float
+            items_collection.update_one(
+                {"_id": item["_id"]},
+                {"$set": {"Price": updated_price}}
+            )
+            print(f"Updated price for {item['Item_name']} to {updated_price}")
+        except ValueError:
+            print(f"Could not convert price for {item['Item_name']}: {item['Price']}")
+
+# Export sample user data to CSV
+def export_to_csv():
+    users = list(users_collection.find())
+    pd.DataFrame(users).to_csv('users_sample_data.csv', index=False)
+    print("Sample data exported to CSV successfully.")
+
+# Creating a grocery list document
+def create_grocery_list(user_id):
+    # Fetch user data
+    user = users_collection.find_one({"_id": ObjectId(user_id)})
     if not user:
-        print(f"User with email {email} not found.")
+        print(f"User with ID {user_id} not found.")
         return
     
     # Get food request and dietary restrictions
@@ -76,33 +176,25 @@ def create_grocery_list():
     filtered_items = []
     for item in items:
         ingredients = item.get("Ingredients", [])
+        # Ensure no allergens are present and it meets dietary restrictions
         if any(allergen in ingredients for allergen in allergies):
-            continue
+            continue  # Skip if allergen is found in the ingredients
+        
         if dietary_restrictions:
             if not any(dr in ingredients for dr in dietary_restrictions):
-                continue
+                continue  # Skip if dietary restrictions are not met
+        
         filtered_items.append(item)
     
-    # Ensure price is treated as a float and calculate total cost
-    total_cost = 0
-    for item in filtered_items:
-        price = item.get('Price', 0)
-        # Convert price to float if it's not already a float
-        try:
-            price = float(price)
-        except ValueError:
-            print(f"Warning: Invalid price for item {item['Item_name']}. Skipping.")
-            continue
-        total_cost += price
-    
     # Check if filtered items match the budget
+    total_cost = sum(item['Price'] for item in filtered_items)
     if total_cost > budget:
         print(f"The total cost of the filtered items ({total_cost}) exceeds your budget ({budget}).")
         # Optionally, suggest cheaper alternatives here
     
     # Create the grocery list
     grocery_list = {
-        "User_email": email,  # Store the user's email instead of user_id
+        "User_id": user_id,
         "Items": [{"Item_name": item["Item_name"], "Price": item["Price"]} for item in filtered_items],
         "Total_Cost": total_cost
     }
@@ -113,7 +205,6 @@ def create_grocery_list():
         print(f"Grocery list created with ID: {result.inserted_id}")
     except pymongo.errors.PyMongoError as e:
         print(f"An error occurred while creating the grocery list: {e}")
-
 
 # Main menu
 def main():
@@ -148,7 +239,8 @@ def main():
         elif choice == "7":
             update_prices_in_items()
         elif choice == "8":
-            create_grocery_list()  # No need for user_id
+            user_id = input("Enter user ID to create grocery list: ")
+            create_grocery_list(user_id)
         elif choice == "9":
             break
         else:
