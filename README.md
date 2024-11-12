@@ -55,6 +55,7 @@ npm install react@latest react-dom@latest
 npm install lucide-react
 npm install -D tailwindcss postcss autoprefixer
 npm install @radix-ui/react-icons class-variance-authority clsx tailwindcss-animate @shadcn/ui
+npm install react@18.2.0 react-dom@18.2.0 react-router-dom@6.14.0 and then run
 ```
 #### 3. Run the Frontend
 ```
