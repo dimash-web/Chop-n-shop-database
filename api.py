@@ -1,11 +1,27 @@
 from fastapi import FastAPI, HTTPException
 from main import users_collection, stores_collection, items_collection
-# from openai_service import generate_grocery_list  #importing the open ai function
 from pydantic import BaseModel
 from bson import ObjectId
 import uuid
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+# Allow all origins (or specify allowed origins in a list)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # or specify origins like ["http://localhost:3000"]
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+)
+
+app = FastAPI()
+
+class LoginUser(BaseModel):
+    email: str
+    password: str
+
 
 # define the pydantic models for input validation
 class Item(BaseModel):
@@ -120,6 +136,17 @@ async def add_user(user: User):
     except Exception as e:
         return {"error": f"An error occurred while adding the user: {str(e)}"}
 
+@app.post("/login/")
+async def login(user: LoginUser):
+    # Find user by email
+    existing_user = users_collection.find_one({"email": user.email})
+
+    # Check if user exists and the password matches
+    if existing_user and existing_user["password"] == user.password:
+        return {"message": "Login successful"}
+    else:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
 # retrieving the users
 @app.get("/users/")
 async def get_users():
@@ -205,3 +232,8 @@ async def delete_grocery_item(user_id: str, item_id: str):
         return {"message": "Grocery item deleted successfully"}
     else:
         raise HTTPException(status_code=404, detail="Grocery item not found")
+
+
+@app.options("/{path:path}")
+async def preflight_handler(path: str):
+    return {"message": "CORS preflight handled"}
