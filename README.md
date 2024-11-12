@@ -1,5 +1,5 @@
 # Chop N' Shop Week 9: Full Stack
-This is prototype fullstack application for Chop N' Shop, our grocery shopping assistant. We integrated several of our **FastAPI** endpoints with our **MongoDB** database and Frontend components. This prototype will allow you to register a new user, authenticate an existing user, and update or add a grocery list.
+This is prototype fullstack application for Chop N' Shop, our grocery shopping assistant. We integrated several of our **FastAPI** endpoints with our **MongoDB** database and Frontend components. This prototype will allow you to register a new user, authenticate an existing user, and retrieve a recipe.
 
 ## Setting Up & Running Instructions
 ### Backend Setup
@@ -51,11 +51,10 @@ cd chop-n-shop-frontend
 Navigate to the project directory and install the necessary dependencies using npm:
 ```
 npm install
-npm install react@latest react-dom@latest
+npm install react@18.2.0 react-dom@18.2.0 react-router-dom@6.14.0
 npm install lucide-react
 npm install -D tailwindcss postcss autoprefixer
 npm install @radix-ui/react-icons class-variance-authority clsx tailwindcss-animate @shadcn/ui
-npm install react@18.2.0 react-dom@18.2.0 react-router-dom@6.14.0 and then run
 ```
 #### 3. Run the Frontend
 ```
@@ -85,6 +84,7 @@ This will start the React development server and the frontend will be available 
 ## Low Fidelity Wireframe 
 ![WireFrame](Wireframe.jpg)
 
+--------------------------------------
 # Chop N' Shop Week 6: API
 
 We used **FastAPI** and **MongoDB** to create an API for managing a list of grocery items. This API allows you to create, view, update, and delete **items** in a database. Each item includes a name, its store, price, applicable ingredients, and a calorie count.
