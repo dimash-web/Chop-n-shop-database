@@ -82,7 +82,7 @@ This will start the React development server and the frontend will be available 
 - `DELETE /items/{item_id}`: deletes an item by its ID.
 
 ## Low Fidelity Wireframe 
-
+![WireFrame](Wireframe.jpg)
 
 # Chop N' Shop Week 6: API
 
