@@ -1,9 +1,10 @@
 from fastapi import FastAPI, HTTPException
-from main import users_collection, stores_collection, items_collection
+from main import users_collection, stores_collection, items_collection, recipes_collection
 from pydantic import BaseModel
 from bson import ObjectId
 import uuid
 from fastapi.middleware.cors import CORSMiddleware
+import re
 
 app = FastAPI()
 
@@ -16,7 +17,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app = FastAPI()
 
 class LoginUser(BaseModel):
     email: str
@@ -37,19 +37,33 @@ class User(BaseModel):
     password: str
     budget: float
     dietary_restrictions: str
-    allergies: str
-    food_request: str
-    preferred_stores: str
+    allergies: list[str]
+    food_request: list[str]
+    preferred_stores: list[str]
 
 class Store(BaseModel):
     name: str
 
-# Model for grocery list items
-class GroceryItem(BaseModel):
-    item_name: str
-    quantity: int
-    store_name: str = None  # Optional field for preferred store
+class Recipe(BaseModel):
+    Recipe_id: str
+    Recipe_name: str
+    Ingredients: list[str]
 
+#endpoint to get recipe by name
+@app.get("/recipes/{recipe_name}")
+async def get_recipe(recipe_name: str):
+    # Perform a case-insensitive search using regex
+    recipe = recipes_collection.find_one({"Recipe_name": {"$regex": f"^{re.escape(recipe_name)}$", "$options": "i"}})
+    if recipe:
+        # Convert ObjectId to string for returning to the user
+        recipe["_id"] = str(recipe["_id"])  # Convert ObjectId to string
+        return {
+            "Recipe_id": recipe.get("Recipe_id", ""),
+            "Recipe_name": recipe.get("Recipe_name", ""),
+            "Ingredients": recipe.get("Ingredients", []),
+            "_id": recipe["_id"]
+        }
+    raise HTTPException(status_code=404, detail="Recipe not found")
 
 # endpoint to get all items
 @app.get("/items/")
@@ -179,32 +193,6 @@ async def add_store(store: Store):
         return {"message": f"Store {store.name} added with ID: {result.inserted_id}"}
     except Exception as e:
         return {"error": f"An error occurred while adding the store: {str(e)}"}
-
-
-
-# Endpoint to add items to a user's grocery list
-@app.post("/users/{user_id}/grocery-list/")
-async def add_grocery_item(user_id: str, item: GroceryItem):
-    # Find user by ID
-    user = users_collection.find_one({"_id": ObjectId(user_id)})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    # Create item document with a unique ID
-    grocery_item = {
-        "item_id": str(uuid.uuid4()),
-        "item_name": item.item_name,
-        "quantity": item.quantity,
-        "store_name": item.store_name
-    }
-
-    # Update user's document to add the item to grocery list array
-    users_collection.update_one(
-        {"_id": ObjectId(user_id)},
-        {"$push": {"grocery_list": grocery_item}}
-    )
-
-    return {"message": "Grocery item added successfully", "grocery_item": grocery_item}
 
 # Endpoint to retrieve the grocery list for a user
 @app.get("/users/{user_id}/grocery-list/")
