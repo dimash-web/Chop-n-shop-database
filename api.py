@@ -35,15 +35,7 @@ class User(BaseModel):
     first_name: str
     email: str
     password: str
-<<<<<<< HEAD
-    budget: float
-    dietary_restrictions: str
-    allergies: list[str]
-    food_request: list[str]
-    preferred_stores: list[str]
-=======
     allergies: str
->>>>>>> b87df3d (Minor change)
 
 class Store(BaseModel):
     name: str
@@ -225,6 +217,4 @@ async def delete_grocery_item(user_id: str, item_id: str):
         raise HTTPException(status_code=404, detail="Grocery item not found")
 
 
-@app.options("/{path:path}")
-async def preflight_handler(path: str):
-    return {"message": "CORS preflight handled"}
+
