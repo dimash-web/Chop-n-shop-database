@@ -10,7 +10,7 @@ from scipy.spatial.distance import cosine
 from sentence_transformers import SentenceTransformer #using sentence transformers for embeddings
 
 # Load environment variables and connect to MongoDB
-load_dotenv()
+load_dotenv(override=True)
 
 mongodb_uri = os.getenv("MONGO_URI")
 client = pymongo.MongoClient(mongodb_uri)

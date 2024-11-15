@@ -4,3 +4,4 @@ pandas
 uuid
 fastapi[standard]
 openai
+bcrypt

@@ -5,6 +5,8 @@ from bson import ObjectId
 import uuid
 from fastapi.middleware.cors import CORSMiddleware
 import re
+import bcrypt
+from passlib.context import CryptContext
 
 app = FastAPI()
 
@@ -44,6 +46,11 @@ class Recipe(BaseModel):
     Recipe_id: str
     Recipe_name: str
     Ingredients: list[str]
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def hash_password(password: str):
+    return pwd_context.hash(password)
 
 #endpoint to get recipe by name
 @app.get("/recipes/{recipe_name}")
@@ -122,21 +129,31 @@ async def delete_item(item_id: str):
 #     return {"grocery_list": grocery_list}
 
 # endpoint to add user to the database
+
 @app.post("/register/")
 async def add_user(user: User):
+    # check if an account with that email already exists!!!
+    existing_user = users_collection.find_one({"email": user.email})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already in use")
+    
+    # still need to add 
     # dietary_restrictions = [] if not user.dietary_restrictions or user.dietary_restrictions.lower() == "none" else user.dietary_restrictions.split(",")
-    allergies = [] if not user.allergies or user.allergies.lower() == "none" else user.allergies.split(",")
     # food_request = [] if not user.food_request or user.food_request.lower() == "none" else user.food_request.split(",")
     # preferred_stores = [] if not user.preferred_stores or user.preferred_stores.lower() == "none" else user.preferred_stores.split(",")
 
+    # hashing the user's password before saving it 
+    hashed_password = hash_password(user.password)
+
+    # creating user document with registration ingo 
     user_document = {
         "first_name": user.first_name,
         "email": user.email,
-        "password": user.password,
+        "password": hashed_password,
         # "dietary_restrictions": dietary_restrictions,
-        "allergies": allergies,
+        "allergies": user.allergies.split(",") if user.allergies else []
         # "food_request": food_request,
-        # "preferred_stores": preferred_stores,
+        #"preferred_stores": preferred_stores,
     }
 
     try:
@@ -145,16 +162,20 @@ async def add_user(user: User):
     except Exception as e:
         return {"error": f"An error occurred while adding the user: {str(e)}"}
 
+
 @app.post("/login/")
 async def login(user: LoginUser):
-    # Find user by email
+    # find user by email, then check if they exist
     existing_user = users_collection.find_one({"email": user.email})
+    if not existing_user:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    # Check if user exists and the password matches
-    if existing_user and existing_user["password"] == user.password:
+    # verifying password...
+    if pwd_context.verify(user.password, existing_user["password"]):
         return {"message": "Login successful"}
     else:
         raise HTTPException(status_code=401, detail="Invalid email or password")
+
 
 # retrieving the users
 @app.get("/users/")
