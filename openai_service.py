@@ -3,6 +3,9 @@ import os
 from dotenv import load_dotenv
 from pymongo import MongoClient
 import random
+import pickle 
+from scipy.spatial.distance import cosine
+from main import generate_embedding, calculate_similarity
 
 # Load environment variables
 load_dotenv()
@@ -14,32 +17,22 @@ client = MongoClient(mongodb_uri)
 db = client["chop-n-shop"]
 items_collection = db["items"]
 
+# Function to generate a grocery list
 def generate_grocery_list(user_preferences):
-    query = {
-        "Store_name": {"$in": user_preferences["Preferred_stores"]} if user_preferences["Preferred_stores"] else {},
-        "Ingredients": {"$nin": user_preferences["Allergies"]},
-        "Price": {"$lte": user_preferences["Budget"]}
-    }
-    if user_preferences.get("Food_type"):
-        query["Food_type"] = {"$in": user_preferences["Food_type"]}
-
-    items = list(items_collection.find(query, {
-        "_id": 0, "Item_name": 1, "Price": 1, "Calories": 1, "Ingredients": 1,
-        "Store_name": 1, "Food_type": 1, "Quantity": 1, "Measurement": 1
-    }))
-
-    if not items:
-        return "No items found matching your preferences."
-
-    random.shuffle(items)
     selected_items = []
     total_cost = 0
-    for item in items:
-        if total_cost + item['Price'] > user_preferences["Budget"]:
-            break
-        selected_items.append(item)
-        total_cost += item['Price']
 
+    for food_request in user_preferences["Food_request"]:
+        # Search for items related to the user's food request
+        query_results = search_items_by_query(food_request)
+        
+        for item_name, similarity_score in query_results:
+            item = items_collection.find_one({"Item_name": item_name})
+            if item and total_cost + item['Price'] <= user_preferences["Budget"]:
+                selected_items.append(item)
+                total_cost += item['Price']
+
+    # Group selected items by store
     store_items = {}
     for item in selected_items:
         store_name = item["Store_name"]
@@ -67,8 +60,8 @@ def generate_grocery_list(user_preferences):
     Specify exact measurements and keep recipes brief.
     """
 
-    recipe_response = openai.chat.completions.create(
-        model="gpt-4.0-mini",
+    recipe_response = openai.ChatCompletion.create(
+        model="gpt-4",
         messages=[{"role": "system", "content": "Generate recipes based only on the provided ingredients."},
                   {"role": "user", "content": recipe_prompt}],
         max_tokens=300,
@@ -79,11 +72,26 @@ def generate_grocery_list(user_preferences):
     
     return formatted_grocery_lists, recipes
 
+# Example search function using embeddings
+def search_items_by_query(query):
+    query_embedding = generate_embedding(query)
+    items = items_collection.find()
+
+    similar_items = []
+    for item in items:
+        item_embedding = pickle.loads(item["embedding"])
+        similarity_score = calculate_similarity(query_embedding, item_embedding)
+        similar_items.append((item["Item_name"], similarity_score))
+
+    similar_items.sort(key=lambda x: x[1], reverse=True)
+    return similar_items[:10]  # Adjust this number as needed
+
 # Example usage
 user_preferences = {
     "Budget": 50,
     "Allergies": ["peanuts", "shellfish"],
-    "Preferred_stores": ["Trader Joe's"]
+    "Preferred_stores": ["Trader Joe's"],
+    "Food_request": ["pizza", "Indian food", "chips"]
 }
 
 # Generate and display grocery list and recipes

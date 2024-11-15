@@ -1,9 +1,13 @@
 import os
-from dotenv import load_dotenv
 import pymongo
 import pandas as pd
 import uuid
+import pickle
 from bson import ObjectId
+from bson.binary import Binary
+from dotenv import load_dotenv
+from scipy.spatial.distance import cosine
+from sentence_transformers import SentenceTransformer #using sentence transformers for embeddings
 
 # Load environment variables and connect to MongoDB
 load_dotenv()
@@ -15,18 +19,83 @@ users_collection = db["users"]
 stores_collection = db["stores"]
 items_collection = db["items"]
 recipes_collection = db["recipes"]
-grocery_lists_collection = db["grocery_lists"]  # New collection for grocery lists
+grocery_lists_collection = db["grocery_lists"] 
 
-# Ping to check the connection
+# initialize the sentence-transformers model --> this should be the most accurate model 
+model = SentenceTransformer('all-MPNet-base-v2') 
+
+# pinging to check the connection 
 try:
     client.admin.command('ping')
     print("Pinged your deployment. You successfully connected to MongoDB!")
 except Exception as e:
     print(e)
 
-# Creating user documents
+# function to generate embeddings for an item name (or description)
+def generate_embedding(text):
+    try:
+        embedding = model.encode(text).tolist() # need to convert to list for Mongo
+        return embedding
+    except Exception as e:
+        print(f"Error generating embedding for '{text}': {e}")
+        return None
+
+# function to update the items collection with embeddings
+def add_embeddings_to_items():
+    items = items_collection.find() 
+
+    for item in items:
+        item_name = item.get("Item_name")
+        if item_name:
+            # generate embedding for the item name
+            embedding = generate_embedding(item_name)
+            if embedding:
+                item["embedding"] = Binary(pickle.dumps(embedding)) 
+
+                # update the item document with the new embedding
+                try:
+                    items_collection.update_one(
+                        {"_id": item["_id"]},
+                        {"$set": {"embedding": item["embedding"]}}
+                    )
+                    print(f"Added embedding for item: {item_name}")
+                except pymongo.errors.PyMongoError as e:
+                    print(f"Error updating item {item_name}: {e}")
+
+# function to calculate cosine similarity between two embeddings --> recced to use cosine
+def calculate_similarity(embedding1, embedding2):
+    return 1 - cosine(embedding1, embedding2)  
+
+# function to search items based on a query
+def search_items_by_query(query):
+    query_embedding = generate_embedding(query)
+
+    if query_embedding:
+        items = items_collection.find()
+
+        similar_items = []
+
+        for item in items:
+            # deserialize the embedding (binary -> list of floats)
+            item_embedding = pickle.loads(item["embedding"])
+            
+            # calculate similarity between the query and the item embedding
+            similarity_score = calculate_similarity(query_embedding, item_embedding)
+            
+            similar_items.append((item["Item_name"], similarity_score))
+
+        # sort items by similarity (highest first)
+        similar_items.sort(key=lambda x: x[1], reverse=True)
+
+        # return the top *blank* most similar items --> can adjust if needed 
+        return similar_items[:50]  
+    else:
+        print("Error generating query embedding.")
+        return []
+
+# creating user documents
 def add_user():
-    # Getting user inputs
+    # getting user inputs
     first_name = input("Enter first name: ")
     email = input("Enter email: ")
     password = input("Enter password: ")
@@ -36,7 +105,7 @@ def add_user():
     food_request = input("Enter food requests (comma-separated): ").split(",")
     preferred_stores = input("Enter preferred stores (comma-separated) or 'none' if none: ")
     
-    # Inserting into user documents
+    # inserting into user documents
     user_document = {
         "First_name": first_name,
         "Email": email,
@@ -54,159 +123,7 @@ def add_user():
     except pymongo.errors.PyMongoError as e:
         print(f"An error occurred while adding the user: {e}")
 
-# Creating store documents
-def add_store():
-    store_id = str(uuid.uuid4())
-    name = input("Enter store name: ")
-
-    # Inserting into store documents
-    store_document = {
-        "Store_id": store_id,
-        "Name": name
-    }
-
-    try:
-        result = stores_collection.insert_one(store_document)
-        print(f"Store {name} added with ID: {result.inserted_id}")
-    except pymongo.errors.PyMongoError as e:
-        print(f"An error occurred while adding the store: {e}")
-
-# Creating item documents from CSV
-def upload_csv_to_items(file_path, store_name):
-    # Load the CSV into a DataFrame
-    df = pd.read_csv(file_path)
-
-    # Rename 'Ounces' column to 'Amount'
-    df.rename(columns={'Ounces': 'Amount'}, inplace=True)
-
-    # Retrieve store info from the `stores` collection based on the store_name
-    store = stores_collection.find_one({"Name": store_name})
-    if not store:
-        print(f"Store '{store_name}' not found in the database.")
-        return
-
-    store_id = store["Store_id"]  # Use the store's existing ID
-
-    # Insert each row as a document in the `items` collection
-    for _, row in df.iterrows():
-        item_document = {
-            "Item_id": str(uuid.uuid4()),  # Generate unique ID for each item
-            "Item_name": row['Product'],
-            "Store_id": store_id,
-            "Store_name": store_name,
-            "Price": row['Price'],
-            "Amount": row['Amount'],  # Use 'Amount' instead of 'Ounces'
-            "Serving_Size": row['Serving Size'],
-            "Calories": row['Calories'],
-            "Ingredients": row['Ingredients'].split(","),
-            "Allergens": row['Allergens'].split(",") if pd.notna(row['Allergens']) else []
-        }
-
-        try:
-            result = items_collection.insert_one(item_document)
-            print(f"Item {row['Product']} added with ID: {result.inserted_id}")
-        except pymongo.errors.PyMongoError as e:
-            print(f"An error occurred while adding the item: {e}")
-
-# Creating recipe documents
-def add_recipe():
-    # Getting recipe inputs
-    recipe_id = str(uuid.uuid4())
-    recipe_name = input("Enter recipe name: ")
-    ingredients = input("Enter ingredients (comma-separated): ").split(",")
-    
-    # Inserting into recipe documents
-    recipe_document = {
-        "Recipe_id": recipe_id,
-        "Recipe_name": recipe_name,
-        "Ingredients": [i.strip() for i in ingredients]
-    }
-
-    try:
-        result = recipes_collection.insert_one(recipe_document)
-        print(f"Recipe {recipe_name} added with ID: {result.inserted_id}")
-    except pymongo.errors.PyMongoError as e:
-        print(f"An error occurred while adding the recipe: {e}")
-
-# Function to fix price field in existing items (convert string to float)
-def update_prices_in_items():
-    items = items_collection.find({"Price": {"$type": "string"}})  # Only items where Price is a string
-
-    for item in items:
-        try:
-            # Clean the 'Price' field to remove any non-numeric characters (like '$')
-            cleaned_price = item['Price'].replace('$', '').replace(',', '').strip()
-            
-            # Convert cleaned price to float
-            updated_price = float(cleaned_price)
-            
-            # Update the item with the new price as a float
-            items_collection.update_one(
-                {"_id": item["_id"]},
-                {"$set": {"Price": updated_price}}
-            )
-            print(f"Updated price for {item['Item_name']} to {updated_price}")
-        except ValueError:
-            print(f"Could not convert price for {item['Item_name']}: {item['Price']}")
-
-# Export sample user data to CSV
-def export_to_csv():
-    users = list(users_collection.find())
-    pd.DataFrame(users).to_csv('users_sample_data.csv', index=False)
-    print("Sample data exported to CSV successfully.")
-
-# Creating a grocery list document
-def create_grocery_list(user_id):
-    # Fetch user data
-    user = users_collection.find_one({"_id": ObjectId(user_id)})
-    if not user:
-        print(f"User with ID {user_id} not found.")
-        return
-    
-    # Get food request and dietary restrictions
-    food_request = user.get("Food_request", [])
-    dietary_restrictions = user.get("Dietary_restrictions", [])
-    allergies = user.get("Allergies", [])
-    budget = user.get("Budget", 0)
-    
-    # Query for items that match the food request
-    items = list(items_collection.find({"Item_name": {"$in": food_request}}))
-    
-    # Filter items based on dietary restrictions and allergies
-    filtered_items = []
-    for item in items:
-        ingredients = item.get("Ingredients", [])
-        # Ensure no allergens are present and it meets dietary restrictions
-        if any(allergen in ingredients for allergen in allergies):
-            continue  # Skip if allergen is found in the ingredients
-        
-        if dietary_restrictions:
-            if not any(dr in ingredients for dr in dietary_restrictions):
-                continue  # Skip if dietary restrictions are not met
-        
-        filtered_items.append(item)
-    
-    # Check if filtered items match the budget
-    total_cost = sum(item['Price'] for item in filtered_items)
-    if total_cost > budget:
-        print(f"The total cost of the filtered items ({total_cost}) exceeds your budget ({budget}).")
-        # Optionally, suggest cheaper alternatives here
-    
-    # Create the grocery list
-    grocery_list = {
-        "User_id": user_id,
-        "Items": [{"Item_name": item["Item_name"], "Price": item["Price"]} for item in filtered_items],
-        "Total_Cost": total_cost
-    }
-    
-    # Insert the grocery list into the grocery_lists collection
-    try:
-        result = grocery_lists_collection.insert_one(grocery_list)
-        print(f"Grocery list created with ID: {result.inserted_id}")
-    except pymongo.errors.PyMongoError as e:
-        print(f"An error occurred while creating the grocery list: {e}")
-
-# Main menu
+# main menu
 def main():
     while True:
         print("\nChoose an option:")
@@ -218,30 +135,22 @@ def main():
         print("6. Upload Items CSV to MongoDB")
         print("7. Update Prices in Items (Fix Existing Data)")
         print("8. Create Grocery List")
-        print("9. Exit")
+        print("9. Add Embeddings to Items")
+        print("10. Search Items by Query")
+        print("11. Exit")
 
-        choice = input("Enter your choice 1-9: ")
+        choice = input("Enter your choice 1-11: ")
 
         if choice == "1":
             add_user()
-        elif choice == "2":
-            add_store()
-        elif choice == "3":
-            add_item()
-        elif choice == "4":
-            add_recipe()
-        elif choice == "5":
-            export_to_csv()
-        elif choice == "6":
-            file_path = input("Enter CSV file path: ")
-            store_name = input("Enter store name: ")
-            upload_csv_to_items(file_path, store_name)
-        elif choice == "7":
-            update_prices_in_items()
-        elif choice == "8":
-            user_id = input("Enter user ID to create grocery list: ")
-            create_grocery_list(user_id)
         elif choice == "9":
+            add_embeddings_to_items()  
+        elif choice == "10":
+            query = input("Enter your search query: ")
+            results = search_items_by_query(query)
+            for item_name, score in results:
+                print(f"Item: {item_name}, Similarity Score: {score}")
+        elif choice == "11":
             break
         else:
             print("Invalid choice. Please try again.")
