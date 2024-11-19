@@ -1,116 +1,93 @@
 import openai
 import os
+import json
 from dotenv import load_dotenv
 from pymongo import MongoClient
-import pickle
-from main import generate_embedding, calculate_similarity
+import pymongo
+import re 
 
-# Load environment variables
 load_dotenv(override=True)
 
-# Set up OpenAI API key and MongoDB connection
+# OpenAI API key
 openai.api_key = os.getenv("OPENAI_API_KEY")
+
+# MongoDB connection
 mongodb_uri = os.getenv("MONGO_URI")
-client = MongoClient(mongodb_uri)
+client = pymongo.MongoClient(mongodb_uri)
 db = client["chop-n-shop"]
-items_collection = db["items"]
+recipes_collection = db["recipes"]
 
-def generate_grocery_list(user_preferences):
-    prepared_foods = []
-    fresh_foods = []
-    recipes = []
-    total_cost = 0
-
-    selected_categories = set()  # To ensure only one item per category
-    selected_items = []  # List of selected items for grocery list
-
-    # Handle Prepared Foods (e.g., pizza, chips)
-    for food_request in user_preferences["Prepared_foods"]:
-        # Search for one matching prepared food item
-        query_results = search_items_by_query(food_request)
-
-        for item_name, similarity_score in query_results:
-            item = items_collection.find_one({"Item_name": item_name})
-            if item and item.get("Category") not in selected_categories:
-                item_price = item.get("Price")
-                try:
-                    item_price = float(item_price)
-                except (TypeError, ValueError):
-                    print(f"Skipping item: {item_name}, invalid Price: {item_price}")
-                    continue
-
-                if total_cost + item_price <= user_preferences["Budget"]:
-                    prepared_foods.append(item)
-                    selected_items.append(item)
-                    selected_categories.add(item.get("Category"))
-                    total_cost += item_price
-                    break  # Only one item per category
-
-    # Handle Fresh Foods (e.g., fruits, vegetables)
-    for fresh_food in user_preferences["Fresh_foods"]:
-        query_results = search_items_by_query(fresh_food)
-
-        for item_name, similarity_score in query_results:
-            item = items_collection.find_one({"Item_name": item_name})
-            if item and item.get("Category") not in selected_categories:
-                item_price = item.get("Price")
-                try:
-                    item_price = float(item_price)
-                except (TypeError, ValueError):
-                    print(f"Skipping item: {item_name}, invalid Price: {item_price}")
-                    continue
-
-                if total_cost + item_price <= user_preferences["Budget"]:
-                    fresh_foods.append(item)
-                    selected_items.append(item)
-                    selected_categories.add(item.get("Category"))
-                    total_cost += item_price
-
-    # Handle Recipe Creation (if user requests recipes)
-    if user_preferences.get("Recipes_to_make"):
-        recipe_prompt = f"Based on the following ingredients: {', '.join(user_preferences['Recipes_to_make'])}, generate a simple recipe with quantities."
-        recipe_response = openai.chat.completions.create(
+def generate_recipe(prompt):
+    """
+    Generate a recipe using OpenAI based on the user's prompt.
+    """
+    try:
+        response = openai.chat.completions.create(
             model="gpt-4",
-            messages=[{"role": "user", "content": recipe_prompt}],
-            max_tokens=300,
+            messages=[
+                {"role": "system", "content": "You are a professional recipe generator."},
+                {"role": "user", "content": f"Create a detailed recipe based on the following request: {prompt}. "
+                                             f"Return the recipe in JSON format with the following keys: "
+                                             f"name, ingredients (list), simplified ingredients (list), instructions (list), prep_time, cook_time, total_time."}
+            ],
+            max_tokens=500,
             temperature=0.7
         )
-        recipes = recipe_response.choices[0].message.content.strip()
+        recipe_json = response.choices[0].message.content.strip()
+        recipe_data = json.loads(recipe_json)  # Convert JSON string to Python dictionary
+        return recipe_data
+    except json.JSONDecodeError:
+        print("Error: Could not decode JSON from OpenAI response.")
+        return None
+    except Exception as e:
+        print(f"Error generating recipe: {e}")
+        return None
 
-    # Format grocery list
-    formatted_grocery_lists = "Prepared Foods:\n"
-    for item in prepared_foods:
-        formatted_grocery_lists += f"{item['Item_name']}, {item.get('Quantity', '1')} {item.get('Measurement', 'unit')}, ${item['Price']}\n"
-    formatted_grocery_lists += "\nFresh Foods:\n"
-    for item in fresh_foods:
-        formatted_grocery_lists += f"{item['Item_name']}, {item.get('Quantity', '1')} {item.get('Measurement', 'unit')}, ${item['Price']}\n"
+def save_recipe_to_db(recipe_data):
+    """
+    Save the recipe to the MongoDB `recipes` collection, including simplified ingredients.
+    """
+    try:
+        recipe_document = {
+            "name": recipe_data.get('name', 'Unnamed Recipe'),
+            "ingredients": recipe_data.get('ingredients', []),  # Original ingredients
+            "simplified_ingredients": recipe_data.get('simplified_ingredients', []),  # Simplified ingredients
+            "instructions": recipe_data.get('instructions', []),
+            "prep_time": recipe_data.get('prep_time', 'Unknown'),
+            "cook_time": recipe_data.get('cook_time', 'Unknown'),
+            "total_time": recipe_data.get('total_time', 'Unknown'),
+        }
+        result = recipes_collection.insert_one(recipe_document)
+        print(f"Recipe saved successfully with ID: {result.inserted_id}")
+        return result.inserted_id
+    except Exception as e:
+        print(f"Error saving recipe to database: {e}")
+        return None
 
-    formatted_grocery_lists += f"\nRemaining Budget: ${user_preferences['Budget'] - total_cost:.2f}\n"
+def generate_and_save_recipe(user_prompt):
+    """
+    Generate a recipe using OpenAI and save it to MongoDB.
+    """
+    print("Generating recipe...")
+    recipe_data = generate_recipe(user_prompt)
+    
+    if not recipe_data:
+        print("Failed to generate recipe.")
+        return None
 
-    return formatted_grocery_lists, recipes
+    print("Saving recipe to database...")
+    recipe_id = save_recipe_to_db(recipe_data)
+    return recipe_id
 
-def search_items_by_query(query):
-    query_embedding = generate_embedding(query)
-    items = items_collection.find()
-
-    similar_items = []
-    for item in items:
-        item_embedding = pickle.loads(item["embedding"])
-        similarity_score = calculate_similarity(query_embedding, item_embedding)
-        similar_items.append((item["Item_name"], similarity_score))
-
-    similar_items.sort(key=lambda x: x[1], reverse=True)
-    return similar_items[:5]  # Return top 5 similar items
-
-# Example usage
-user_preferences = {
-    "Budget": 50,
-    "Prepared_foods": ["pizza", "chips", "frozen curry"],  # Prepared foods user wants
-    "Fresh_foods": ["milk", "apples", "bananas", "lettuce"],  # Fresh foods user wants
-    "Recipes_to_make": ["pasta"],  # Recipes user wants to make
-}
-
-# Generate and display grocery list and recipes
-grocery_list, recipes = generate_grocery_list(user_preferences)
-print("Grocery List:\n", grocery_list)
-print("\nRecipes:\n", recipes)
+# Example Usage
+if __name__ == "__main__":
+    # User's natural language input
+    user_prompt = "I want a recipe for a quick and easy vegetarian lasagna."
+    
+    # Generate and save recipe
+    recipe_id = generate_and_save_recipe(user_prompt)
+    
+    if recipe_id:
+        print(f"Recipe successfully saved to database with ID: {recipe_id}")
+    else:
+        print("Recipe generation and saving failed.")

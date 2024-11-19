@@ -1,13 +1,14 @@
 import os
 import pymongo
 import pandas as pd
-import uuid
 import pickle
+import faiss
+import numpy as np
 from bson import ObjectId
 from bson.binary import Binary
 from dotenv import load_dotenv
 from scipy.spatial.distance import cosine
-from sentence_transformers import SentenceTransformer #using sentence transformers for embeddings
+from sentence_transformers import SentenceTransformer  # Using sentence transformers for embeddings
 
 # Load environment variables and connect to MongoDB
 load_dotenv(override=True)
@@ -19,141 +20,149 @@ users_collection = db["users"]
 stores_collection = db["stores"]
 items_collection = db["items"]
 recipes_collection = db["recipes"]
-grocery_lists_collection = db["grocery_lists"] 
+grocery_lists_collection = db["grocery_lists"]
 
-# initialize the sentence-transformers model --> this should be the most accurate model 
-model = SentenceTransformer('all-MPNet-base-v2') 
+# Initialize the sentence-transformers model
+model = SentenceTransformer('all-MPNet-base-v2')
 
-# pinging to check the connection 
+# Ping to check the connection
 try:
     client.admin.command('ping')
     print("Pinged your deployment. You successfully connected to MongoDB!")
 except Exception as e:
     print(e)
 
-# function to generate embeddings for an item name (or description)
+# Build a FAISS index from MongoDB embeddings
+def build_faiss_index():
+    # Fetch all items with embeddings from MongoDB
+    items = items_collection.find({"embedding": {"$exists": True}})
+    
+    # Extract embeddings and their corresponding IDs
+    embeddings = []
+    ids = []
+    count = 0  # Counter for progress tracking
+
+    for item in items:
+        embedding = pickle.loads(item["embedding"])  # Deserialize embedding
+        embeddings.append(embedding)
+        ids.append(str(item["_id"]))  # Use stringified ObjectId as ID
+        count += 1
+        if count % 100 == 0:
+            print(f"{count} embeddings processed...")
+
+    # Convert embeddings to numpy array (required by FAISS)
+    embeddings_np = np.array(embeddings).astype("float32")
+    
+    # Initialize a FAISS index
+    dimension = embeddings_np.shape[1]
+    index = faiss.IndexFlatL2(dimension)  # L2 distance for similarity
+    
+    # Add embeddings to the FAISS index
+    index.add(embeddings_np)
+    
+    print(f"FAISS index built with {index.ntotal} items.")
+    return index, ids  # Return the index and IDs
+
+# Function to generate embeddings for an item name (or description)
 def generate_embedding(text):
     try:
-        embedding = model.encode(text).tolist() # need to convert to list for Mongo
-        return embedding
+        return model.encode(text).tolist()
     except Exception as e:
         print(f"Error generating embedding for '{text}': {e}")
         return None
 
-# function to update the items collection with embeddings
-def add_embeddings_to_items():
-    items = items_collection.find() 
-
-    for item in items:
-        item_name = item.get("Item_name")
-        if item_name:
-            # generate embedding for the item name
-            embedding = generate_embedding(item_name)
-            if embedding:
-                item["embedding"] = Binary(pickle.dumps(embedding)) 
-
-                # update the item document with the new embedding
-                try:
-                    items_collection.update_one(
-                        {"_id": item["_id"]},
-                        {"$set": {"embedding": item["embedding"]}}
-                    )
-                    print(f"Added embedding for item: {item_name}")
-                except pymongo.errors.PyMongoError as e:
-                    print(f"Error updating item {item_name}: {e}")
-
-# function to calculate cosine similarity between two embeddings --> recced to use cosine
-def calculate_similarity(embedding1, embedding2):
-    return 1 - cosine(embedding1, embedding2)  
-
-# function to search items based on a query
-def search_items_by_query(query):
+# Function to search items based on a query
+def search_items_by_query_faiss(query, index, ids, top_k=25):
     query_embedding = generate_embedding(query)
 
     if query_embedding:
-        items = items_collection.find()
-
+        query_np = np.array([query_embedding]).astype("float32")
+        distances, indices = index.search(query_np, top_k)
+        
         similar_items = []
-
-        for item in items:
-            # deserialize the embedding (binary -> list of floats)
-            item_embedding = pickle.loads(item["embedding"])
-            
-            # calculate similarity between the query and the item embedding
-            similarity_score = calculate_similarity(query_embedding, item_embedding)
-            
-            similar_items.append((item["Item_name"], similarity_score))
-
-        # sort items by similarity (highest first)
-        similar_items.sort(key=lambda x: x[1], reverse=True)
-
-        # return the top *blank* most similar items --> can adjust if needed 
-        return similar_items[:50]  
+        for dist, idx in zip(distances[0], indices[0]):
+            if idx != -1:  # Check if a valid index is returned
+                item_id = ids[idx]
+                item = items_collection.find_one({"_id": ObjectId(item_id)})
+                if item:
+                    similar_items.append((item["Item_name"], 1 - dist))  # Convert distance to similarity
+        
+        return similar_items
     else:
         print("Error generating query embedding.")
         return []
 
-# creating user documents
-def add_user():
-    # getting user inputs
-    first_name = input("Enter first name: ")
-    email = input("Enter email: ")
-    password = input("Enter password: ")
-    budget = float(input("Enter budget: "))
-    dietary_restrictions = input("Enter dietary restrictions (comma-separated) or 'none' if none: ")
-    allergies = input("Enter allergies (comma-separated) or 'none' if none: ")
-    food_request = input("Enter food requests (comma-separated): ").split(",")
-    preferred_stores = input("Enter preferred stores (comma-separated) or 'none' if none: ")
-    
-    # inserting into user documents
-    user_document = {
-        "First_name": first_name,
-        "Email": email,
-        "Password": password,
-        "Budget": budget,
-        "Dietary_restrictions": [] if dietary_restrictions.lower() == "none" else [dr.strip() for dr in dietary_restrictions.split(",")],
-        "Allergies": [] if allergies.lower() == "none" else [a.strip() for a in allergies.split(",")],
-        "Food_request": [f.strip() for f in food_request],
-        "Preferred_stores": [] if preferred_stores.lower() == "none" else [s.strip() for s in preferred_stores.split(",")]
-    }
-    
+# Save the FAISS index and IDs list to disk
+def save_faiss_index(index, ids, index_file, ids_file):
     try:
-        result = users_collection.insert_one(user_document)
-        print(f"User {first_name} added with ID: {result.inserted_id}")
-    except pymongo.errors.PyMongoError as e:
-        print(f"An error occurred while adding the user: {e}")
+        # Save the FAISS index
+        faiss.write_index(index, index_file)
+        # Save the IDs list
+        with open(ids_file, "wb") as f:
+            pickle.dump(ids, f)
+        print("FAISS index and IDs saved successfully.")
+    except Exception as e:
+        print(f"Error saving FAISS index or IDs: {e}")
 
-# main menu
+# Load the FAISS index and IDs list from disk
+def load_faiss_index(index_file, ids_file):
+    try:
+        # Load the FAISS index
+        index = faiss.read_index(index_file)
+        # Load the IDs list
+        with open(ids_file, "rb") as f:
+            ids = pickle.load(f)
+        print("FAISS index and IDs loaded successfully.")
+        return index, ids
+    except Exception as e:
+        print(f"Error loading FAISS index: {e}")
+        return None, None
+
+# Main menu
 def main():
+    global faiss_index, item_ids  # To use the FAISS index in menu options
+
+    # Check if FAISS index files exist before attempting to load
+    if os.path.exists("faiss_index_file.index") and os.path.exists("ids_list.pkl"):
+        faiss_index, item_ids = load_faiss_index("faiss_index_file.index", "ids_list.pkl")
+    else:
+        print("FAISS index files not found, rebuilding index...")
+        faiss_index, item_ids = build_faiss_index()
+        save_faiss_index(faiss_index, item_ids, "faiss_index_file.index", "ids_list.pkl")
+
+    if not faiss_index or not item_ids:
+        print("Error loading FAISS index. Exiting...")
+        return
+
     while True:
         print("\nChoose an option:")
-        print("1. Add User")
-        print("2. Add Store")
-        print("3. Add Item")
-        print("4. Add Recipe")
-        print("5. Export Users to CSV")
-        print("6. Upload Items CSV to MongoDB")
-        print("7. Update Prices in Items (Fix Existing Data)")
-        print("8. Create Grocery List")
-        print("9. Add Embeddings to Items")
-        print("10. Search Items by Query")
-        print("11. Exit")
+        print("1. Search Items by Query")
+        print("2. Exit")
 
-        choice = input("Enter your choice 1-11: ")
+        choice = input("Enter your choice: ")
 
         if choice == "1":
-            add_user()
-        elif choice == "9":
-            add_embeddings_to_items()  
-        elif choice == "10":
             query = input("Enter your search query: ")
-            results = search_items_by_query(query)
-            for item_name, score in results:
-                print(f"Item: {item_name}, Similarity Score: {score}")
-        elif choice == "11":
+            results = search_items_by_query_faiss(query, faiss_index, item_ids)
+            if results:
+                for item_name, score in results:
+                    print(f"Item: {item_name}, Similarity Score: {score:.2f}")
+            else:
+                print("No similar items found.")
+        elif choice == "2":
+            print("Exiting...")
             break
         else:
             print("Invalid choice. Please try again.")
 
 if __name__ == "__main__":
+    print("Building FAISS index...")
+
+    # Check if FAISS index files exist before attempting to load
+    if os.path.exists("faiss_index_file.index") and os.path.exists("ids_list.pkl"):
+        faiss_index, item_ids = load_faiss_index("faiss_index_file.index", "ids_list.pkl")
+    else:
+        faiss_index, item_ids = build_faiss_index()
+        save_faiss_index(faiss_index, item_ids, "faiss_index_file.index", "ids_list.pkl")
+    
     main()
