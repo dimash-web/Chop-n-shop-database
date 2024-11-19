@@ -2,6 +2,7 @@ pymongo
 python-dotenv
 pandas
 uuid
+uvicorn
 fastapi[standard]
 openai
 bcrypt
