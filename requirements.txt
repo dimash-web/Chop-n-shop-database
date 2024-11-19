@@ -5,3 +5,7 @@ uuid
 fastapi[standard]
 openai
 bcrypt
+faiss
+sentence_transformers
+bson
+json
