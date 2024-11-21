@@ -9,6 +9,5 @@ bcrypt
 faiss-cpu
 sentence_transformers
 bson
-json
 scipy
 passlib

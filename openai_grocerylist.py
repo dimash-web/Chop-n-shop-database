@@ -65,7 +65,7 @@ def generate_grocery_list(user_preferences):
     selected_categories = {"Trader Joe's": set(), "Whole Foods Market": set()}
 
     for store in grocery_lists.keys():
-        for request in user_preferences["Prepared_foods"] + user_preferences["Fresh_foods"]:
+        for request in user_preferences["Grocery_items"]:
             query_results = search_items_by_query_faiss(request)
 
             for item in query_results:
@@ -93,28 +93,32 @@ def generate_grocery_list(user_preferences):
             ],
             "Total_Cost": round(total_costs[store], 2),
         }
+    # Save the result to the MongoDB grocery_list collection
+    # grocery_lists_collection.insert_one(grocery_lists)  # Insert the grocery list as a JSON document
 
     # Return lists based on store preference
     if user_preferences.get("Store_preference"):
         store = user_preferences["Store_preference"]
         return {store: formatted_lists.get(store, {"message": f"No items found for {store}."})}
+    
+    grocery_lists_collection.insert_one(formatted_lists)  # Insert here
+
     return formatted_lists
 
 # Example user preferences
 user_preferences = {
     "Budget": 50.00,
-    "Prepared_foods": ["pizza", "chips", "juice"],
-    "Fresh_foods": ["lettuce", "tomato", "milk"],
+    "Grocery_items": ["pizza", "chips", "juice"],
     "Dietary_preferences": "vegan",
     "Allergies": ["peanuts"],
-    "Store_preference": None,  # Set to "Trader Joe's", "Whole Foods Market", or None for both
+    "Store_preference": None, 
 }
 
-# Generate grocery list
+# # Generate grocery list
 grocery_lists = generate_grocery_list(user_preferences)
 
-# Save the result to the MongoDB grocery_list collection
-grocery_lists_collection.insert_one(grocery_lists)  # Insert the grocery list as a JSON document
+# # Save the result to the MongoDB grocery_list collection
+#grocery_lists_collection.insert_one(grocery_lists)  # Insert the grocery list as a JSON document
 
-# Print confirmation
+# # Print confirmation
 print("Grocery list saved to the database successfully!")
