@@ -9,6 +9,8 @@ from datetime import datetime
 from enum import Enum
 from main import users_collection, stores_collection, items_collection, recipes_collection, grocery_lists_collection
 from openai_grocerylist import generate_grocery_list 
+from openai_json_recipe import generate_recipe, save_recipe_to_db
+from openai_recipe_grocery_list import generate_grocery_list_from_recipe
 
 app = FastAPI()
 
@@ -59,12 +61,83 @@ class Item(BaseModel):
     Ingredients: list[str]
     Calories: int
 
-class GroceryList(BaseModel):
-    items: List[str]
-    budget: Decimal
-    storePreference: Optional[str] = None
-    dietaryPreference: Optional[str] = None
+class RecipeListUserPreferences(BaseModel):
+    Budget: float
+    Dietary_preferences: str
+    Allergies: List[str]
 
+class RecipeGroceryItem(BaseModel):
+    ingredient: str
+    item_name: str
+    price: float
+    store: str
+
+class RecipeGroceryListResponse(BaseModel):
+    grocery_list: List[RecipeGroceryItem]
+    total_cost: float
+    over_budget: float
+
+class RecipePrompt(BaseModel):
+    recipe_prompt: str
+
+class GroceryItem(BaseModel):
+    ingredient: str
+    item_name: str
+    price: float
+    store: str
+
+# Define user preferences model
+class UserPreferences(BaseModel):
+    Budget: float
+    Dietary_preferences: str
+    Allergies: List[str]
+
+# Define request and response models
+class RecipeRequest(BaseModel):
+    recipe_name: str
+    user_preferences: UserPreferences
+
+class RecipeResponse(BaseModel):
+    recipe_id: str
+    recipe_name: str
+    grocery_list: List[GroceryItem]
+    total_cost: float
+    over_budget: float
+
+@app.post("/generate_recipe_with_grocery_list", response_model=RecipeResponse)
+async def generate_recipe_with_grocery_list(recipe_request: RecipeRequest):
+    """
+    Create a recipe and immediately fetch a grocery list for its ingredients.
+    """
+    try:
+        # Step 1: Generate the recipe (mocked for now, replace with your actual logic)
+        recipe_id = ObjectId()  # Generate a new ObjectId
+        recipe_data = {
+            "_id": recipe_id,
+            "name": recipe_request.recipe_name,
+            "simplified_ingredients": ["ingredient1", "ingredient2", "ingredient3"],  # Replace with actual generation
+        }
+        recipes_collection.insert_one(recipe_data)
+
+        # Step 2: Generate the grocery list using the new recipe's ID
+        grocery_list, total_cost, over_budget = generate_grocery_list_from_recipe(
+            recipe_id=recipe_id, user_preferences=recipe_request.user_preferences.dict()
+        )
+
+        # Step 3: Return the response
+        return RecipeResponse(
+            recipe_id=str(recipe_id),
+            recipe_name=recipe_request.recipe_name,
+            grocery_list=[GroceryItem(**item) for item in grocery_list],
+            total_cost=total_cost,
+            over_budget=over_budget,
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="An unexpected error occurred.")
+    
 # Utility functions for password handling
 def hash_password(password: str):
     return pwd_context.hash(password)
@@ -129,17 +202,7 @@ async def generate_grocery_list_endpoint(user_preferences: UserPreferences):
         return {"grocery_list": grocery_list}
     except Exception as e:
         print(f"Error generating grocery list: {e}")
-        raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.")
-
-
-
-    # try:
-    #     result = users_collection.insert_one(user_document)
-    #     return {"message": f"User {user.first_name} added with ID: {result.inserted_id}"}
-
-    # grocery_lists = generate_grocery_list(user_preferences)
-    # grocery_lists_collection.insert_one(grocery_lists)  # Insert the grocery list as a JSON document
-    
+        raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.")    
 
 # Route to fetch previous grocery lists for a user
 @app.get("/users/{user_id}/grocery-lists/")
@@ -151,24 +214,24 @@ async def get_grocery_lists(user_id: str):
     return user.get("grocery_lists", [])
 
 # Route to store a grocery list for a user
-@app.post("/users/{user_id}/grocery-lists/")
-async def create_grocery_list(user_id: str, grocery_list: GroceryList):
-    user = users_collection.find_one({"_id": ObjectId(user_id)})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+# @app.post("/users/{user_id}/grocery-lists/")
+# async def create_grocery_list(user_id: str, grocery_list: GroceryList):
+#     user = users_collection.find_one({"_id": ObjectId(user_id)})
+#     if not user:
+#         raise HTTPException(status_code=404, detail="User not found")
 
-    grocery_list_document = grocery_list.dict()
-    grocery_list_document["created_at"] = datetime.utcnow()
+#     grocery_list_document = grocery_list.dict()
+#     grocery_list_document["created_at"] = datetime.utcnow()
 
-    update_result = users_collection.update_one(
-        {"_id": ObjectId(user_id)},
-        {"$push": {"grocery_lists": grocery_list_document}}
-    )
+#     update_result = users_collection.update_one(
+#         {"_id": ObjectId(user_id)},
+#         {"$push": {"grocery_lists": grocery_list_document}}
+#     )
 
-    if update_result.modified_count == 1:
-        return {"message": "Grocery list created successfully"}
-    else:
-        raise HTTPException(status_code=500, detail="Error saving grocery list")
+#     if update_result.modified_count == 1:
+#         return {"message": "Grocery list created successfully"}
+#     else:
+#         raise HTTPException(status_code=500, detail="Error saving grocery list")
 
 # Route to fetch all available items (can be useful for frontend)
 @app.get("/items/")
@@ -181,3 +244,61 @@ async def get_items():
 async def get_stores():
     stores = list(stores_collection.find())
     return [{"Store_name": store["Store_name"]} for store in stores]
+
+# @app.post("/generate_recipe/")
+# async def generate_recipe(prompt: RecipePrompt):
+#     try: 
+#         recipe = generate_recipe(prompt.recipe_prompt)
+#         if not recipe:
+#             raise HTTPException(status_code=400, detail="Failed to generate recipe. Please try again.")
+        
+#         # recipe_id = save_recipe_to_db(prompt.recipe_prompt, recipe)
+#         # return {"recipe_id": recipe_id, "recipe": recipe}
+    
+#     except Exception as e:
+#         print(f"Error generating recipe: {e}")
+#         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.")    
+
+@app.post("/generate_recipe/")
+async def generate_recipe_route(prompt: RecipePrompt):
+    try:
+        # Call the function directly
+        recipe = generate_recipe(prompt.recipe_prompt)
+        if not recipe:
+            raise HTTPException(status_code=400, detail="Failed to generate recipe. Please try again.")
+        
+        recipe_id = save_recipe_to_db(recipe)
+        if not recipe_id:
+            raise HTTPException(status_code=500, detail="Failed to save recipe to database.")
+        return {"recipe": recipe}
+
+    except Exception as e:
+        print(f"Error generating recipe: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred.")
+
+
+# @app.post("/generate_grocery_list/")
+# async def generate_grocery_list_endpoint(user_preferences: UserPreferences):
+#     try:
+#         # Validate input items
+#         if not user_preferences.Grocery_items:
+#             raise HTTPException(status_code=400, detail="Items list cannot be empty.")
+
+#         # Handle the store name being None
+#         store_preference = user_preferences.Store_preference if user_preferences.Store_preference else None
+
+#         # Generate grocery list based on preferences
+#         grocery_list = generate_grocery_list({
+#             "Budget": user_preferences.Budget,
+#             "Grocery_items": user_preferences.Grocery_items,
+#             "Dietary_preferences": user_preferences.Dietary_preferences,
+#             "Allergies": user_preferences.Allergies,
+#             "Store_preference": store_preference,  # Safely pass None if no store preference
+#         })
+#         grocery_lists_collection.insert_one(grocery_list)
+#         grocery_list["_id"] = str(grocery_list["_id"])
+#         return {"grocery_list": grocery_list}
+#     except Exception as e:
+#         print(f"Error generating grocery list: {e}")
+#         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.")    
+
