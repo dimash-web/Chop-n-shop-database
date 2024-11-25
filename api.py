@@ -193,12 +193,20 @@ async def generate_grocery_list_endpoint(user_preferences: UserPreferences):
             "Allergies": user_preferences.Allergies,
             "Store_preference": store_preference,  # Safely pass None if no store preference
         })
+
+        # Remove _id if present before inserting into the database
+        if "_id" in grocery_list:
+            del grocery_list["_id"]
+
+        # Insert the generated grocery list into the collection
         grocery_lists_collection.insert_one(grocery_list)
+
+        # Return the grocery list with its new _id
         grocery_list["_id"] = str(grocery_list["_id"])
         return {"grocery_list": grocery_list}
     except Exception as e:
         print(f"Error generating grocery list: {e}")
-        raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.")    
+        raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.")  
 
 # Route to fetch previous grocery lists for a user
 @app.get("/users/{user_id}/grocery-lists/")
