@@ -1,18 +1,24 @@
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status,Header
 from pydantic import BaseModel, condecimal
 from bson import ObjectId
 from fastapi.middleware.cors import CORSMiddleware
 from passlib.context import CryptContext
 from typing import List, Optional
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from main import users_collection, stores_collection, items_collection, recipes_collection, grocery_lists_collection
 from openai_grocerylist import generate_grocery_list 
 from openai_json_recipe import generate_recipe, save_recipe_to_db
 from openai_recipe_grocery_list import generate_grocery_list_from_recipe
+import jwt
+from jwt.exceptions import PyJWTError
 
 app = FastAPI()
+
+SECRET_KEY = "2@1&]."  # Use a strong secret key in production
+ALGORITHM = "HS256"  # Algorithm for encoding and decoding JWT tokens
+ACCESS_TOKEN_EXPIRE_MINUTES = 300  # Expiry time for the token
 
 
 # CORS middleware for frontend access
@@ -26,6 +32,27 @@ app.add_middleware(
 
 # Cryptography (for hashing passwords)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def create_access_token(data: dict, expires_delta: timedelta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + expires_delta
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+
+def get_current_user(authorization: str = Header(...)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authorization header missing or invalid")
+    try:
+        token = authorization.split(" ")[1]  # "Bearer <token>"
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User ID not found in token")
+        return user_id
+    except PyJWTError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Invalid token: {str(e)}")
 
 # Enum for dietary preferences
 class DietaryPreference(str, Enum):
@@ -171,12 +198,14 @@ async def login(user: LoginUser):
     existing_user = users_collection.find_one({"email": user.email})
     if not existing_user or not verify_password(user.password, existing_user["password"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
-
-    return {"message": "Login successful", "user_id": str(existing_user["_id"])}
+    
+    # Generate JWT token
+    access_token = create_access_token(data={"sub": str(existing_user["_id"])})
+    return {"message": "Login successful", "access_token": access_token, "token_type": "bearer"}
 
 # Route to generate a grocery list based on user preferences
 @app.post("/generate_grocery_list/")
-async def generate_grocery_list_endpoint(user_preferences: UserPreferences):
+async def generate_grocery_list_endpoint(user_preferences: UserPreferences, current_user: str = Depends(get_current_user)):
     try:
         # Validate input items
         if not user_preferences.Grocery_items:
@@ -198,7 +227,8 @@ async def generate_grocery_list_endpoint(user_preferences: UserPreferences):
         if "_id" in grocery_list:
             del grocery_list["_id"]
 
-        # Insert the generated grocery list into the collection
+        # Insert the generated grocery list into the collection with user association
+        grocery_list["user_id"] = current_user  # Associate the list with the logged-in user
         grocery_lists_collection.insert_one(grocery_list)
 
         # Return the grocery list with its new _id
@@ -206,16 +236,54 @@ async def generate_grocery_list_endpoint(user_preferences: UserPreferences):
         return {"grocery_list": grocery_list}
     except Exception as e:
         print(f"Error generating grocery list: {e}")
-        raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.")  
+        raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.")
 
 # Route to fetch previous grocery lists for a user
-@app.get("/users/{user_id}/grocery-lists/")
-async def get_grocery_lists(user_id: str):
-    user = users_collection.find_one({"_id": ObjectId(user_id)})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+@app.get("/grocery_lists")
+async def get_grocery_lists(current_user: str = Depends(get_current_user)):
+    try:
+        grocery_lists = grocery_lists_collection.find({"user_id": current_user})
+        if not grocery_lists:
+            return {"grocery_lists": []}
+            
+        grocery_list_items = []
+        for list_item in grocery_lists:
+            list_item["_id"] = str(list_item["_id"])
+            grocery_list_items.append(list_item)
+            
+        return {"grocery_lists": grocery_list_items}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
-    return user.get("grocery_lists", [])
+@app.delete("/grocery_lists/{list_id}")
+async def delete_grocery_list(list_id: str, current_user: str = Depends(get_current_user)):
+    try:
+        if not list_id or list_id == "undefined":
+            raise HTTPException(status_code=400, detail="Invalid list ID")
+            
+        result = grocery_lists_collection.delete_one({
+            "_id": ObjectId(list_id), 
+            "user_id": current_user
+        })
+        
+        if result.deleted_count == 0:
+            raise HTTPException(
+                status_code=404, 
+                detail="Grocery list not found or you don't have permission to delete it"
+            )
+            
+        return {"message": "Grocery list deleted successfully"}
+        
+    except InvalidId:
+        raise HTTPException(status_code=400, detail="Invalid list ID format")
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"An error occurred while deleting the grocery list: {str(e)}"
+        )
 
 # Route to store a grocery list for a user
 # @app.post("/users/{user_id}/grocery-lists/")
