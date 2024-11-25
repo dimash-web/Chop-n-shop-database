@@ -61,11 +61,6 @@ class Item(BaseModel):
     Ingredients: list[str]
     Calories: int
 
-class RecipeListUserPreferences(BaseModel):
-    Budget: float
-    Dietary_preferences: str
-    Allergies: List[str]
-
 class RecipeGroceryItem(BaseModel):
     ingredient: str
     item_name: str
@@ -87,7 +82,7 @@ class GroceryItem(BaseModel):
     store: str
 
 # Define user preferences model
-class UserPreferences(BaseModel):
+class RecipeListUserPreferences(BaseModel):
     Budget: float
     Dietary_preferences: str
     Allergies: List[str]
@@ -95,7 +90,7 @@ class UserPreferences(BaseModel):
 # Define request and response models
 class RecipeRequest(BaseModel):
     recipe_name: str
-    user_preferences: UserPreferences
+    user_preferences: RecipeListUserPreferences
 
 class RecipeResponse(BaseModel):
     recipe_id: str
@@ -104,22 +99,20 @@ class RecipeResponse(BaseModel):
     total_cost: float
     over_budget: float
 
+
 @app.post("/generate_recipe_with_grocery_list", response_model=RecipeResponse)
 async def generate_recipe_with_grocery_list(recipe_request: RecipeRequest):
     """
-    Create a recipe and immediately fetch a grocery list for its ingredients.
+    Search for a recipe by name and generate a grocery list based on its ingredients.
     """
     try:
-        # Step 1: Generate the recipe (mocked for now, replace with your actual logic)
-        recipe_id = ObjectId()  # Generate a new ObjectId
-        recipe_data = {
-            "_id": recipe_id,
-            "name": recipe_request.recipe_name,
-            "simplified_ingredients": ["ingredient1", "ingredient2", "ingredient3"],  # Replace with actual generation
-        }
-        recipes_collection.insert_one(recipe_data)
+        # Step 1: Check if the recipe exists
+        recipe = recipes_collection.find_one({"name": recipe_request.recipe_name})
+        if not recipe:
+            raise HTTPException(status_code=404, detail="This recipe does not exist.")
 
-        # Step 2: Generate the grocery list using the new recipe's ID
+        # Step 2: Generate the grocery list using the existing recipe's ID
+        recipe_id = recipe["_id"]
         grocery_list, total_cost, over_budget = generate_grocery_list_from_recipe(
             recipe_id=recipe_id, user_preferences=recipe_request.user_preferences.dict()
         )
@@ -127,7 +120,7 @@ async def generate_recipe_with_grocery_list(recipe_request: RecipeRequest):
         # Step 3: Return the response
         return RecipeResponse(
             recipe_id=str(recipe_id),
-            recipe_name=recipe_request.recipe_name,
+            recipe_name=recipe["name"],
             grocery_list=[GroceryItem(**item) for item in grocery_list],
             total_cost=total_cost,
             over_budget=over_budget,
@@ -135,8 +128,11 @@ async def generate_recipe_with_grocery_list(recipe_request: RecipeRequest):
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException as e:
+        raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail="An unexpected error occurred.")
+
     
 # Utility functions for password handling
 def hash_password(password: str):
@@ -245,20 +241,6 @@ async def get_stores():
     stores = list(stores_collection.find())
     return [{"Store_name": store["Store_name"]} for store in stores]
 
-# @app.post("/generate_recipe/")
-# async def generate_recipe(prompt: RecipePrompt):
-#     try: 
-#         recipe = generate_recipe(prompt.recipe_prompt)
-#         if not recipe:
-#             raise HTTPException(status_code=400, detail="Failed to generate recipe. Please try again.")
-        
-#         # recipe_id = save_recipe_to_db(prompt.recipe_prompt, recipe)
-#         # return {"recipe_id": recipe_id, "recipe": recipe}
-    
-#     except Exception as e:
-#         print(f"Error generating recipe: {e}")
-#         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.")    
-
 @app.post("/generate_recipe/")
 async def generate_recipe_route(prompt: RecipePrompt):
     try:
@@ -277,28 +259,20 @@ async def generate_recipe_route(prompt: RecipePrompt):
         raise HTTPException(status_code=500, detail="An unexpected error occurred.")
 
 
-# @app.post("/generate_grocery_list/")
-# async def generate_grocery_list_endpoint(user_preferences: UserPreferences):
-#     try:
-#         # Validate input items
-#         if not user_preferences.Grocery_items:
-#             raise HTTPException(status_code=400, detail="Items list cannot be empty.")
+@app.get("/recipes/{recipe_name}/")
+async def get_recipe_by_name(recipe_name: str):
+    """
+    Fetch a recipe by its name.
+    """
+    try:
+        recipe = recipes_collection.find_one({"name": recipe_name})
+        if not recipe:
+            raise HTTPException(status_code=404, detail="Recipe not found")
 
-#         # Handle the store name being None
-#         store_preference = user_preferences.Store_preference if user_preferences.Store_preference else None
+        # Convert ObjectId to string and return the recipe
+        recipe["_id"] = str(recipe["_id"])
+        return recipe
 
-#         # Generate grocery list based on preferences
-#         grocery_list = generate_grocery_list({
-#             "Budget": user_preferences.Budget,
-#             "Grocery_items": user_preferences.Grocery_items,
-#             "Dietary_preferences": user_preferences.Dietary_preferences,
-#             "Allergies": user_preferences.Allergies,
-#             "Store_preference": store_preference,  # Safely pass None if no store preference
-#         })
-#         grocery_lists_collection.insert_one(grocery_list)
-#         grocery_list["_id"] = str(grocery_list["_id"])
-#         return {"grocery_list": grocery_list}
-#     except Exception as e:
-#         print(f"Error generating grocery list: {e}")
-#         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.")    
-
+    except Exception as e:
+        print(f"Error fetching recipe by name: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred.")
