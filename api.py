@@ -391,80 +391,54 @@ async def get_recipe_by_name(recipe_name: str):
         print(f"Error fetching recipe by name: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred.")
 
-@app.get("/api/user")
-async def get_current_user(user_email: str):
-    user = users_collection.find_one({"email": user_email}) 
-    if not user:
-        raise HTTPException(status_code=404, detail=f"User with email {user_email} not found")
+# @app.get("/api/user")
+# async def get_current_user(user_email: str):
+#     user = users_collection.find_one({"email": user_email}) 
+#     if not user:
+#         raise HTTPException(status_code=404, detail=f"User with email {user_email} not found")
 
-    return {
-        "id": str(user["_id"]),
-        "first_name": user.get("first_name", ""),
-        "email": user.get("email", ""),
-        "allergies": user.get("allergies", []),
-    }
+#     return {
+#         "id": str(user["_id"]),
+#         "first_name": user.get("first_name", ""),
+#         "email": user.get("email", ""),
+#         "allergies": user.get("allergies", []),
+#     }
 
-
-
-@app.put("/grocery_lists/{list_id}/add_item")
+@app.post("/grocery_lists/{list_id}/add_item")
 async def add_item_to_grocery_list(
     list_id: str, 
-    new_item: NewGroceryItem,
+    new_item: NewGroceryItem, 
     current_user: str = Depends(get_current_user)
 ):
     try:
-        # Verify list exists and belongs to user
+        # Validate the list_id
+        if not ObjectId.is_valid(list_id):
+            raise HTTPException(status_code=400, detail="Invalid list ID")
+
+        # Find the grocery list
         grocery_list = grocery_lists_collection.find_one({
             "_id": ObjectId(list_id),
             "user_id": current_user
         })
-        
+
         if not grocery_list:
-            raise HTTPException(
-                status_code=404,
-                detail="Grocery list not found or unauthorized"
-            )
-            
-        # Add new item to appropriate store section
-        store_name = new_item.Store_name
-        
-        # Create store section if it doesn't exist
-        if store_name not in grocery_list:
-            grocery_list[store_name] = {
-                "items": [],
-                "Total_Cost": 0
-            }
-            
-        # Add item to store section
-        grocery_list[store_name]["items"].append({
-            "Item_name": new_item.Item_name,
-            "Price": new_item.Price
-        })
-        
-        # Update store total cost
-        grocery_list[store_name]["Total_Cost"] += new_item.Price
-        
-        # Update document in database
-        result = grocery_lists_collection.update_one(
+            raise HTTPException(status_code=404, detail="Grocery list not found or you don't have permission to modify it")
+
+        # Add the new item to the grocery list
+        new_item_dict = new_item.dict()
+        grocery_lists_collection.update_one(
             {"_id": ObjectId(list_id)},
-            {"$set": grocery_list}
+            {"$push": {"grocery_list": new_item_dict}}
         )
-        
-        if result.modified_count == 0:
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to update grocery list"
-            )
-            
-        return {"message": "Item added successfully"}
-        
-    except InvalidId:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid list ID format"
+
+        # Update the total cost
+        new_total_cost = grocery_list.get("total_cost", 0) + new_item.Price
+        grocery_lists_collection.update_one(
+            {"_id": ObjectId(list_id)},
+            {"$set": {"total_cost": new_total_cost}}
         )
+
+        return {"message": f"Item '{new_item.Item_name}' added to the grocery list successfully"}
+
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"An error occurred: {str(e)}"
-        ) 
+        raise HTTPException(status_code=500, detail=f"An error occurred while adding the item: {str(e)}")
