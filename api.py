@@ -72,6 +72,15 @@ class UserPreferences(BaseModel):
     Allergies: List[str]
     Store_preference: Optional[str] = None
 
+class SaveRecipeRequest(BaseModel):
+    recipe_name: str
+    ingredients: List[str]
+    instructions: List[str]
+    cooking_time: int
+    servings: int
+    dietary_preferences: Optional[List[str]] = None
+    allergies: Optional[List[str]] = None
+
 class User(BaseModel):
     first_name: str
     email: str
@@ -391,18 +400,18 @@ async def get_recipe_by_name(recipe_name: str):
         print(f"Error fetching recipe by name: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred.")
 
-# @app.get("/api/user")
-# async def get_current_user(user_email: str):
-#     user = users_collection.find_one({"email": user_email}) 
-#     if not user:
-#         raise HTTPException(status_code=404, detail=f"User with email {user_email} not found")
+@app.get("/api/user")
+async def get_current_user(user_email: str):
+    user = users_collection.find_one({"email": user_email}) 
+    if not user:
+        raise HTTPException(status_code=404, detail=f"User with email {user_email} not found")
 
-#     return {
-#         "id": str(user["_id"]),
-#         "first_name": user.get("first_name", ""),
-#         "email": user.get("email", ""),
-#         "allergies": user.get("allergies", []),
-#     }
+    return {
+        "id": str(user["_id"]),
+        "first_name": user.get("first_name", ""),
+        "email": user.get("email", ""),
+        "allergies": user.get("allergies", []),
+    }
 
 @app.post("/grocery_lists/{list_id}/add_item")
 async def add_item_to_grocery_list(
@@ -442,3 +451,80 @@ async def add_item_to_grocery_list(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred while adding the item: {str(e)}")
+
+@app.post("/recipes/save")
+async def save_recipe(
+    recipe: SaveRecipeRequest,
+    current_user: str = Depends(get_current_user)
+):
+    try:
+        # Check if recipe already exists for this user
+        existing_recipe = recipes_collection.find_one({
+            "name": recipe.recipe_name,
+            "user_id": current_user
+        })
+        
+        if existing_recipe:
+            raise HTTPException(
+                status_code=400, 
+                detail="A recipe with this name already exists"
+            )
+
+        # Create recipe document
+        recipe_document = {
+            "name": recipe.recipe_name,
+            "ingredients": recipe.ingredients,
+            "instructions": recipe.instructions,
+            "cooking_time": recipe.cooking_time,
+            "servings": recipe.servings,
+            "dietary_preferences": recipe.dietary_preferences or [],
+            "allergies": recipe.allergies or [],
+            "user_id": current_user,
+            "created_at": datetime.utcnow()
+        }
+
+        # Insert into database
+        result = recipes_collection.insert_one(recipe_document)
+        
+        return {
+            "message": "Recipe saved successfully",
+            "recipe_id": str(result.inserted_id)
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error saving recipe: {str(e)}"
+        )
+
+@app.get("/recipes/saved")
+async def get_saved_recipes(current_user: str = Depends(get_current_user)):
+    try:
+        # Find all recipes saved by the current user
+        saved_recipes = recipes_collection.find({"user_id": current_user})
+        
+        # Convert cursor to list and format the response
+        recipes_list = []
+        for recipe in saved_recipes:
+            recipes_list.append({
+                "recipe_id": str(recipe["_id"]),
+                "name": recipe["name"],
+                "ingredients": recipe["ingredients"],
+                "instructions": recipe["instructions"],
+                "cooking_time": recipe["cooking_time"],
+                "servings": recipe["servings"],
+                "dietary_preferences": recipe.get("dietary_preferences", []),
+                "allergies": recipe.get("allergies", []),
+                "created_at": recipe["created_at"]
+            })
+            
+        return {
+            "recipes": recipes_list,
+            "total_count": len(recipes_list)
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching saved recipes: {str(e)}"
+        )
