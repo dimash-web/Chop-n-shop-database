@@ -404,3 +404,17 @@ async def get_recipe_by_name(recipe_name: str):
     except Exception as e:
         print(f"Error fetching recipe by name: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred.")
+
+@app.get("/api/user")
+async def get_current_user(user_email: str):
+    user = users_collection.find_one({"email": user_email}) 
+    if not user:
+        raise HTTPException(status_code=404, detail=f"User with email {user_email} not found")
+
+    return {
+        "id": str(user["_id"]),
+        "first_name": user.get("first_name", ""),
+        "email": user.get("email", ""),
+        "allergies": user.get("allergies", []),
+    }
+
