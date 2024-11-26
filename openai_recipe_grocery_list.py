@@ -44,10 +44,36 @@ def is_item_valid(item, dietary_preferences, allergens):
     simplified_ingredients = normalize_ingredients(item.get("Simplified Ingredients", []))
 
     exclusions = {
-        "vegan": ["meat", "egg", "dairy", "milk", "cheese", "butter", "honey"],
-        "vegetarian": ["meat"],
-        "gluten-free": ["wheat", "barley", "rye", "gluten"],
-        "lactose-free": ["milk", "cheese", "butter", "cream"],
+        "vegan": [
+            "meat", "lamb", "chicken", "beef", "pork", "turkey", "duck", "veal", "bison", "goat", "game meat", 
+            "salami", "sausage", "bacon", "hot dog", "deli meat", "fish", "salmon", "tuna", "shrimp", "lobster", 
+            "crab", "cod", "mackerel", "sardines", "anchovies", "shellfish", "eggs", "chicken eggs", "duck eggs", 
+            "quail eggs", "egg powder", "milk", "cow's milk", "goat's milk", "sheep's milk", "cream", "butter", 
+            "cheese", "cheddar", "mozzarella", "parmesan", "brie", "gouda", "feta", "yogurt", "ice cream", "whey", 
+            "casein", "lactose", "honey", "royal jelly", "bee pollen", "gelatin", "marshmallow", "gummy", "fish sauce", 
+            "anchovy paste", "animal fat", "lard", "tallow", "bone marrow", "rennet"
+        ],
+        "vegetarian": [
+            "meat", "lamb", "chicken", "beef", "pork", "turkey", "duck", "veal", "bison", "goat", "game meat", 
+            "salami", "sausage", "bacon", "hot dog", "deli meat", "fish", "salmon", "tuna", "shrimp", "lobster", 
+            "crab", "cod", "mackerel", "sardines", "anchovies", "shellfish"
+        ],
+        "gluten-free": [
+            "wheat", "barley", "rye", "oats", "seitan", "bulgur", "couscous", "wheat flour", "whole wheat", "wheat germ", 
+            "wheat bran", "semolina", "durum", "wheat starch", "spelt", "farro", "malt", "malt syrup", "malt vinegar", 
+            "rye flour", "rye bread", "rye crackers", "barley flour", "barley-based products", "seitan", "bread", "cake", 
+            "cookie", "pasta"
+        ],
+        "lactose-free": [
+            "milk", "cow's milk", "goat's milk", "sheep's milk", "cheese", "cheddar", "mozzarella", "brie", "gouda", 
+            "feta", "parmesan", "cream cheese", "ricotta", "butter", "margarine", "cream", "heavy cream", "sour cream", 
+            "half-and-half", "whipped cream", "ice cream", "yogurt", "Greek yogurt", "whey", "lactose"
+        ],
+        "pescetarian": [
+            "meat", "chicken", "beef", "pork", "turkey", "duck", "veal", "bison", "goat", "game meat", 
+            "lamb", "chicken breast", "chicken wings", "chicken legs", "chicken thighs", "steak", "ground beef", 
+            "pork chops", "bacon", "ham", "sausage", "pork", "duck breast", "duck legs", "confit"
+        ]
     }
     if dietary_preferences in exclusions:
         if any(exclusion in simplified_ingredients for exclusion in exclusions[dietary_preferences]):
