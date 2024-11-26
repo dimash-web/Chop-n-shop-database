@@ -65,6 +65,7 @@ class DietaryPreference(str, Enum):
 
 # Pydantic models for input validation
 class UserPreferences(BaseModel):
+    list_name: str
     Budget: float
     Grocery_items: List[str]
     Dietary_preferences: str
@@ -268,8 +269,8 @@ async def generate_grocery_list_endpoint(user_preferences: UserPreferences, list
         grocery_list["user_id"] = current_user  # Associate the list with the logged-in user
 
         # If a list name is provided, include it in the grocery list document
-        if list_name:
-            grocery_list["list_name"] = list_name
+        if user_preferences.list_name:
+            grocery_list["list_name"] = user_preferences.list_name
 
         # Insert the grocery list into the database
         grocery_lists_collection.insert_one(grocery_list)
