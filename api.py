@@ -65,6 +65,7 @@ class DietaryPreference(str, Enum):
 
 # Pydantic models for input validation
 class UserPreferences(BaseModel):
+    list_name: str
     Budget: float
     Grocery_items: List[str]
     Dietary_preferences: str
@@ -268,8 +269,8 @@ async def generate_grocery_list_endpoint(user_preferences: UserPreferences, list
         grocery_list["user_id"] = current_user  # Associate the list with the logged-in user
 
         # If a list name is provided, include it in the grocery list document
-        if list_name:
-            grocery_list["list_name"] = list_name
+        if user_preferences.list_name:
+            grocery_list["list_name"] = user_preferences.list_name
 
         # Insert the grocery list into the database
         grocery_lists_collection.insert_one(grocery_list)
@@ -403,3 +404,17 @@ async def get_recipe_by_name(recipe_name: str):
     except Exception as e:
         print(f"Error fetching recipe by name: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred.")
+
+@app.get("/api/user")
+async def get_current_user(user_email: str):
+    user = users_collection.find_one({"email": user_email}) 
+    if not user:
+        raise HTTPException(status_code=404, detail=f"User with email {user_email} not found")
+
+    return {
+        "id": str(user["_id"]),
+        "first_name": user.get("first_name", ""),
+        "email": user.get("email", ""),
+        "allergies": user.get("allergies", []),
+    }
+
