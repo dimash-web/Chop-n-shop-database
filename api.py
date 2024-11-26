@@ -128,39 +128,50 @@ class RecipeResponse(BaseModel):
     grocery_list: List[GroceryItem]
     total_cost: float
     over_budget: float
+    user_id: str
 
+class NewGroceryItem(BaseModel):
+    Item_name: str
+    Store_name: str
+    Price: float
 
 # Generate recipe with grocery list
 @app.post("/generate_recipe_with_grocery_list", response_model=RecipeResponse)
-async def generate_recipe_with_grocery_list(recipe_request: RecipeRequest):
-    """
-    Search for a recipe by name and generate a grocery list based on its ingredients.
-    Optionally, allow users to save the list with a custom name.
-    """
+async def generate_recipe_with_grocery_list(
+    recipe_request: RecipeRequest,
+    current_user: str = Depends(get_current_user)
+):
     try:
         # Step 1: Check if the recipe exists
         recipe = recipes_collection.find_one({"name": recipe_request.recipe_name})
         if not recipe:
             raise HTTPException(status_code=404, detail="This recipe does not exist.")
 
-        # Step 2: Generate the grocery list using the existing recipe's ID
+        # Step 2: Generate the grocery list
         recipe_id = recipe["_id"]
-        grocery_list, total_cost, over_budget = generate_grocery_list_from_recipe(
-            recipe_id=recipe_id, user_preferences=recipe_request.user_preferences.dict()
-        )
+        try:
+            grocery_list, total_cost, over_budget = generate_grocery_list_from_recipe(
+                recipe_id=recipe_id, user_preferences=recipe_request.user_preferences.dict()
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error generating grocery list: {str(e)}")
 
-        # Step 3: Optionally save the grocery list with a name if provided
-        if recipe_request.list_name:
-            recipe_list_document = {
-                "list_name": recipe_request.list_name,
-                "recipe_name": recipe_request.recipe_name,
-                "recipe_id": str(recipe_id),
-                "grocery_list": grocery_list,
-                "total_cost": total_cost,
-                "over_budget": over_budget,
-                "created_at": datetime.utcnow()
-            }
-            grocery_lists_collection.insert_one(recipe_list_document)
+        # Step 3: Save the grocery list with user ID
+        recipe_list_document = {
+            "list_name": recipe_request.list_name or f"Recipe List for {recipe_request.recipe_name}",
+            "recipe_name": recipe_request.recipe_name,
+            "recipe_id": str(recipe_id),
+            "grocery_list": grocery_list,
+            "total_cost": total_cost,
+            "over_budget": over_budget,
+            "created_at": datetime.utcnow(),
+            "user_id": current_user
+        }
+        try:
+            result = grocery_lists_collection.insert_one(recipe_list_document)
+            inserted_id = result.inserted_id
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error saving grocery list: {str(e)}")
 
         # Step 4: Return the response
         return RecipeResponse(
@@ -169,16 +180,13 @@ async def generate_recipe_with_grocery_list(recipe_request: RecipeRequest):
             grocery_list=[GroceryItem(**item) for item in grocery_list],
             total_cost=total_cost,
             over_budget=over_budget,
+            user_id=current_user 
         )
 
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
     except HTTPException as e:
         raise e
     except Exception as e:
-        raise HTTPException(status_code=500, detail="An unexpected error occurred.")
-
-
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 # Fetch saved recipe lists by name
 @app.get("/recipe_lists/")
 async def get_recipe_list_by_name(list_name: str):
@@ -336,28 +344,6 @@ async def delete_grocery_list(list_id: str, current_user: str = Depends(get_curr
             status_code=500, 
             detail=f"An error occurred while deleting the grocery list: {str(e)}"
         )
-
-# Route to store a grocery list for a user
-# @app.post("/users/{user_id}/grocery-lists/")
-# async def create_grocery_list(user_id: str, grocery_list: GroceryList):
-#     user = users_collection.find_one({"_id": ObjectId(user_id)})
-#     if not user:
-#         raise HTTPException(status_code=404, detail="User not found")
-
-#     grocery_list_document = grocery_list.dict()
-#     grocery_list_document["created_at"] = datetime.utcnow()
-
-#     update_result = users_collection.update_one(
-#         {"_id": ObjectId(user_id)},
-#         {"$push": {"grocery_lists": grocery_list_document}}
-#     )
-
-#     if update_result.modified_count == 1:
-#         return {"message": "Grocery list created successfully"}
-#     else:
-#         raise HTTPException(status_code=500, detail="Error saving grocery list")
-
-# Route to fetch all available items (can be useful for frontend)
 @app.get("/items/")
 async def get_items():
     items = list(items_collection.find())
@@ -418,3 +404,67 @@ async def get_current_user(user_email: str):
         "allergies": user.get("allergies", []),
     }
 
+
+
+@app.put("/grocery_lists/{list_id}/add_item")
+async def add_item_to_grocery_list(
+    list_id: str, 
+    new_item: NewGroceryItem,
+    current_user: str = Depends(get_current_user)
+):
+    try:
+        # Verify list exists and belongs to user
+        grocery_list = grocery_lists_collection.find_one({
+            "_id": ObjectId(list_id),
+            "user_id": current_user
+        })
+        
+        if not grocery_list:
+            raise HTTPException(
+                status_code=404,
+                detail="Grocery list not found or unauthorized"
+            )
+            
+        # Add new item to appropriate store section
+        store_name = new_item.Store_name
+        
+        # Create store section if it doesn't exist
+        if store_name not in grocery_list:
+            grocery_list[store_name] = {
+                "items": [],
+                "Total_Cost": 0
+            }
+            
+        # Add item to store section
+        grocery_list[store_name]["items"].append({
+            "Item_name": new_item.Item_name,
+            "Price": new_item.Price
+        })
+        
+        # Update store total cost
+        grocery_list[store_name]["Total_Cost"] += new_item.Price
+        
+        # Update document in database
+        result = grocery_lists_collection.update_one(
+            {"_id": ObjectId(list_id)},
+            {"$set": grocery_list}
+        )
+        
+        if result.modified_count == 0:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to update grocery list"
+            )
+            
+        return {"message": "Item added successfully"}
+        
+    except InvalidId:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid list ID format"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"An error occurred: {str(e)}"
+        ) 
