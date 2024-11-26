@@ -98,25 +98,25 @@ def generate_grocery_list_from_recipe(recipe_id, user_preferences):
 
     return grocery_list, total_cost, over_budget
 
-# Example Usage
-user_preferences = {
-    "Budget": 100.00,
-    "Dietary_preferences": "vegan",
-    "Allergies": ["peanuts"],
-}
+# # Example Usage
+# user_preferences = {
+#     "Budget": 100.00,
+#     "Dietary_preferences": "vegan",
+#     "Allergies": ["peanuts"],
+# }
 
-recipe_id = ObjectId("673cb0f48d075af54e90fa77")  # Replace with your recipe's ObjectId
+# recipe_id = ObjectId("673cb0f48d075af54e90fa77")  # Replace with your recipe's ObjectId
 
-try:
-    grocery_list, total_cost, over_budget = generate_grocery_list_from_recipe(recipe_id, user_preferences)
-    print("Generated Grocery List:")
-    for item in grocery_list:
-        print(f"{item['ingredient']} -> {item['item_name']} (${item['price']}) at {item['store']}")
-    print(f"\nTotal Cost: ${total_cost:.2f}")
+# try:
+#     grocery_list, total_cost, over_budget = generate_grocery_list_from_recipe(recipe_id, user_preferences)
+#     print("Generated Grocery List:")
+#     for item in grocery_list:
+#         print(f"{item['ingredient']} -> {item['item_name']} (${item['price']}) at {item['store']}")
+#     print(f"\nTotal Cost: ${total_cost:.2f}")
 
-    if over_budget > 0:
-        print(f"Warning: You are over budget by ${over_budget:.2f}")
-    else:
-        print("You are within your budget.")
-except ValueError as e:
-    print(e)
+#     if over_budget > 0:
+#         print(f"Warning: You are over budget by ${over_budget:.2f}")
+#     else:
+#         print("You are within your budget.")
+# except ValueError as e:
+#     print(e)

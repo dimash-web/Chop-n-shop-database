@@ -118,6 +118,8 @@ class RecipeListUserPreferences(BaseModel):
 class RecipeRequest(BaseModel):
     recipe_name: str
     user_preferences: RecipeListUserPreferences
+    list_name: Optional[str] = None  # Optional field for list name
+
 
 class RecipeResponse(BaseModel):
     recipe_id: str
@@ -127,10 +129,12 @@ class RecipeResponse(BaseModel):
     over_budget: float
 
 
+# Generate recipe with grocery list
 @app.post("/generate_recipe_with_grocery_list", response_model=RecipeResponse)
 async def generate_recipe_with_grocery_list(recipe_request: RecipeRequest):
     """
     Search for a recipe by name and generate a grocery list based on its ingredients.
+    Optionally, allow users to save the list with a custom name.
     """
     try:
         # Step 1: Check if the recipe exists
@@ -144,7 +148,20 @@ async def generate_recipe_with_grocery_list(recipe_request: RecipeRequest):
             recipe_id=recipe_id, user_preferences=recipe_request.user_preferences.dict()
         )
 
-        # Step 3: Return the response
+        # Step 3: Optionally save the grocery list with a name if provided
+        if recipe_request.list_name:
+            recipe_list_document = {
+                "list_name": recipe_request.list_name,
+                "recipe_name": recipe_request.recipe_name,
+                "recipe_id": str(recipe_id),
+                "grocery_list": grocery_list,
+                "total_cost": total_cost,
+                "over_budget": over_budget,
+                "created_at": datetime.utcnow()
+            }
+            grocery_lists_collection.insert_one(recipe_list_document)
+
+        # Step 4: Return the response
         return RecipeResponse(
             recipe_id=str(recipe_id),
             recipe_name=recipe["name"],
@@ -158,6 +175,26 @@ async def generate_recipe_with_grocery_list(recipe_request: RecipeRequest):
     except HTTPException as e:
         raise e
     except Exception as e:
+        raise HTTPException(status_code=500, detail="An unexpected error occurred.")
+
+
+# Fetch saved recipe lists by name
+@app.get("/recipe_lists/")
+async def get_recipe_list_by_name(list_name: str):
+    """
+    Fetch a saved recipe list by its name.
+    """
+    try:
+        recipe_list = grocery_lists_collection.find_one({"list_name": list_name})
+        if not recipe_list:
+            raise HTTPException(status_code=404, detail="Recipe list not found")
+
+        # Convert ObjectId to string and return the recipe list
+        recipe_list["_id"] = str(recipe_list["_id"])
+        return recipe_list
+
+    except Exception as e:
+        print(f"Error fetching recipe list by name: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred.")
 
     
@@ -203,9 +240,9 @@ async def login(user: LoginUser):
     access_token = create_access_token(data={"sub": str(existing_user["_id"])})
     return {"message": "Login successful", "access_token": access_token, "token_type": "bearer"}
 
-# Route to generate a grocery list based on user preferences
+# Generate a grocery list based on user preferences
 @app.post("/generate_grocery_list/")
-async def generate_grocery_list_endpoint(user_preferences: UserPreferences, current_user: str = Depends(get_current_user)):
+async def generate_grocery_list_endpoint(user_preferences: UserPreferences, list_name: Optional[str] = None, current_user: str = Depends(get_current_user)):
     try:
         # Validate input items
         if not user_preferences.Grocery_items:
@@ -229,6 +266,12 @@ async def generate_grocery_list_endpoint(user_preferences: UserPreferences, curr
 
         # Insert the generated grocery list into the collection with user association
         grocery_list["user_id"] = current_user  # Associate the list with the logged-in user
+
+        # If a list name is provided, include it in the grocery list document
+        if list_name:
+            grocery_list["list_name"] = list_name
+
+        # Insert the grocery list into the database
         grocery_lists_collection.insert_one(grocery_list)
 
         # Return the grocery list with its new _id
@@ -238,11 +281,18 @@ async def generate_grocery_list_endpoint(user_preferences: UserPreferences, curr
         print(f"Error generating grocery list: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.")
 
-# Route to fetch previous grocery lists for a user
+# Fetch previous grocery lists for a user
 @app.get("/grocery_lists")
-async def get_grocery_lists(current_user: str = Depends(get_current_user)):
+async def get_grocery_lists(list_name: Optional[str] = None, current_user: str = Depends(get_current_user)):
     try:
-        grocery_lists = grocery_lists_collection.find({"user_id": current_user})
+        query = {"user_id": current_user}
+        
+        # If a list name is provided, filter by name as well
+        if list_name:
+            query["list_name"] = list_name
+        
+        grocery_lists = grocery_lists_collection.find(query)
+        
         if not grocery_lists:
             return {"grocery_lists": []}
             
@@ -254,9 +304,10 @@ async def get_grocery_lists(current_user: str = Depends(get_current_user)):
         return {"grocery_lists": grocery_list_items}
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=str(e)
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error fetching grocery lists.",
         )
+
 
 @app.delete("/grocery_lists/{list_id}")
 async def delete_grocery_list(list_id: str, current_user: str = Depends(get_current_user)):
