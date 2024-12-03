@@ -4,6 +4,7 @@ import json
 from dotenv import load_dotenv
 from pymongo import MongoClient
 import pymongo
+import requests
 import re 
 
 load_dotenv(override=True)
@@ -43,7 +44,26 @@ def generate_recipe(prompt):
         print(f"Error generating recipe: {e}")
         return None
 
-def save_recipe_to_db(recipe_data):
+def generate_dish_image(prompt):
+    """
+    Generate a dish image using OpenAI's DALL-E API based on the recipe name and description.
+    """
+    try:
+        image_prompt = f"Create an artistic, photorealistic image of {prompt}."
+        response = requests.post(
+            "https://api.openai.com/v1/images/generations",
+            headers={"Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}"},
+            json={"prompt": image_prompt, "n": 1, "size": "1024x1024"}
+        )
+        response.raise_for_status()  # Raise exception for HTTP errors
+        image_url = response.json()["data"][0]["url"]
+        return image_url
+    except Exception as e:
+        print(f"Error generating image: {e}")
+        return None
+
+
+def save_recipe_to_db(recipe_data, image_url):
     """
     Save the recipe to the MongoDB `recipes` collection, including simplified ingredients.
     """
@@ -56,7 +76,8 @@ def save_recipe_to_db(recipe_data):
             "prep_time": recipe_data.get('prep_time', 'Unknown'),
             "cook_time": recipe_data.get('cook_time', 'Unknown'),
             "total_time": recipe_data.get('total_time', 'Unknown'),
-            "link": recipe_data.get('link', 'Unknown')
+            "link": recipe_data.get('link', 'Unknown'),
+            "image_url": image_url
         }
         result = recipes_collection.insert_one(recipe_document)
         # print(f"Recipe saved successfully with ID: {result.inserted_id}")
@@ -75,9 +96,16 @@ def generate_and_save_recipe(user_prompt):
     if not recipe_data:
         print("Failed to generate recipe.")
         return None
+    
+    print("Generating dish image...")
+    image_url = generate_dish_image(recipe_data.get('name', user_prompt))
 
-    print("Saving recipe to database...")
-    recipe_id = save_recipe_to_db(recipe_data)
+    if not image_url:
+        print("Failed to generate dish image.")
+        return None
+
+    print("Saving recipe and image to database...")
+    recipe_id = save_recipe_to_db(recipe_data, image_url)
     return recipe_id
 
 # Example Usage
@@ -92,3 +120,4 @@ if __name__ == "__main__":
         print(f"Recipe successfully saved to database with ID: {recipe_id}")
     else:
         print("Recipe generation and saving failed.")
+        

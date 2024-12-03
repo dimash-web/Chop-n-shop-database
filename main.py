@@ -4,8 +4,8 @@ import pandas as pd
 import pickle
 import faiss
 import numpy as np
-from bson import ObjectId
-from bson.binary import Binary
+#from bson import ObjectId
+#from bson.binary import Binary
 from dotenv import load_dotenv
 from scipy.spatial.distance import cosine
 from sentence_transformers import SentenceTransformer  # Using sentence transformers for embeddings
@@ -14,6 +14,7 @@ from sentence_transformers import SentenceTransformer  # Using sentence transfor
 load_dotenv(override=True)
 
 mongodb_uri = os.getenv("MONGO_URI")
+print(mongodb_uri)
 client = pymongo.MongoClient(mongodb_uri)
 db = client["chop-n-shop"]
 users_collection = db["users"]

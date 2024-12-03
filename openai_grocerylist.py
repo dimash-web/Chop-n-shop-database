@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from pymongo import MongoClient
 import faiss
 import numpy as np
-from bson.objectid import ObjectId
+#from bson.objectid import ObjectId
 from main import generate_embedding, load_faiss_index
 
 # Load environment variables
