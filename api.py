@@ -413,44 +413,44 @@ async def get_current_user(user_email: str):
         "allergies": user.get("allergies", []),
     }
 
-@app.post("/grocery_lists/{list_id}/add_item")
-async def add_item_to_grocery_list(
-    list_id: str, 
-    new_item: NewGroceryItem, 
-    current_user: str = Depends(get_current_user)
-):
-    try:
-        # Validate the list_id
-        if not ObjectId.is_valid(list_id):
-            raise HTTPException(status_code=400, detail="Invalid list ID")
+# @app.post("/grocery_lists/{list_id}/add_item")
+# async def add_item_to_grocery_list(
+#     list_id: str, 
+#     new_item: NewGroceryItem, 
+#     current_user: str = Depends(get_current_user)
+# ):
+#     try:
+#         # Validate the list_id
+#         if not ObjectId.is_valid(list_id):
+#             raise HTTPException(status_code=400, detail="Invalid list ID")
 
-        # Find the grocery list
-        grocery_list = grocery_lists_collection.find_one({
-            "_id": ObjectId(list_id),
-            "user_id": current_user
-        })
+#         # Find the grocery list
+#         grocery_list = grocery_lists_collection.find_one({
+#             "_id": ObjectId(list_id),
+#             "user_id": current_user
+#         })
 
-        if not grocery_list:
-            raise HTTPException(status_code=404, detail="Grocery list not found or you don't have permission to modify it")
+#         if not grocery_list:
+#             raise HTTPException(status_code=404, detail="Grocery list not found or you don't have permission to modify it")
 
-        # Add the new item to the grocery list
-        new_item_dict = new_item.dict()
-        grocery_lists_collection.update_one(
-            {"_id": ObjectId(list_id)},
-            {"$push": {"grocery_list": new_item_dict}}
-        )
+#         # Add the new item to the grocery list
+#         new_item_dict = new_item.dict()
+#         grocery_lists_collection.update_one(
+#             {"_id": ObjectId(list_id)},
+#             {"$push": {"grocery_list": new_item_dict}}
+#         )
 
-        # Update the total cost
-        new_total_cost = grocery_list.get("total_cost", 0) + new_item.Price
-        grocery_lists_collection.update_one(
-            {"_id": ObjectId(list_id)},
-            {"$set": {"total_cost": new_total_cost}}
-        )
+#         # Update the total cost
+#         new_total_cost = grocery_list.get("total_cost", 0) + new_item.Price
+#         grocery_lists_collection.update_one(
+#             {"_id": ObjectId(list_id)},
+#             {"$set": {"total_cost": new_total_cost}}
+#         )
 
-        return {"message": f"Item '{new_item.Item_name}' added to the grocery list successfully"}
+#         return {"message": f"Item '{new_item.Item_name}' added to the grocery list successfully"}
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"An error occurred while adding the item: {str(e)}")
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"An error occurred while adding the item: {str(e)}")
 
 @app.post("/recipes/save")
 async def save_recipe(
