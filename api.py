@@ -381,19 +381,47 @@ async def generate_recipe_route(prompt: RecipePrompt):
         print(f"Error generating recipe: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred.")
 
+# from bson import json_util
+# from fastapi.encoders import jsonable_encoder
+
+# @app.post("/generate_recipe/")
+# async def generate_recipe_route(prompt: RecipePrompt):
+#     try:
+#         recipe = generate_recipe(prompt.recipe_prompt)
+#         if not recipe:
+#             raise HTTPException(status_code=400, detail="Failed to generate recipe. Please try again.")
+        
+#         recipe_id = save_recipe_to_db(recipe)
+#         if not recipe_id:
+#             raise HTTPException(status_code=500, detail="Failed to save recipe to database.")
+        
+#         # Use FastAPI's jsonable_encoder to ensure the response is JSON serializable
+#         return {"recipe": jsonable_encoder(recipe), "recipe_id": recipe_id}
+
+#     except Exception as e:
+#         print(f"Error generating recipe: {str(e)}")
+#         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.")
 
 @app.get("/recipes/{recipe_name}/")
 async def get_recipe_by_name(recipe_name: str):
     """
-    Fetch a recipe by its name.
+    Fetch the first recipe that matches the given name, with case-insensitive partial matching.
     """
     try:
-        recipe = recipes_collection.find_one({"name": recipe_name})
-        if not recipe:
-            raise HTTPException(status_code=404, detail="Recipe not found")
+        # Create a case-insensitive regex pattern
+        name_pattern = f".*{recipe_name}.*"
+        
+        # Use a case-insensitive regex query and get only the first match
+        recipe = recipes_collection.find_one(
+            {"name": {"$regex": name_pattern, "$options": "i"}}
+        )
 
-        # Convert ObjectId to string and return the recipe
+        if not recipe:
+            raise HTTPException(status_code=404, detail="No recipe found matching the query")
+
+        # Convert ObjectId to string
         recipe["_id"] = str(recipe["_id"])
+
         return recipe
 
     except Exception as e:

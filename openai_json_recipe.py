@@ -28,9 +28,9 @@ def generate_recipe(prompt):
                 {"role": "system", "content": "You are a professional recipe generator."},
                 {"role": "user", "content": f"Create a detailed recipe based on the following request: {prompt}. "
                                              f"Return the recipe in JSON format with the following keys: "
-                                             f"name, ingredients (list), simplified ingredients (list), instructions (list), prep_time, cook_time, total_time, link."}
+                                             f"name, ingredients (list), simplified ingredients (list), instructions (list), prep_time, cook_time, total_time."}
             ],
-            max_tokens=500,
+            max_tokens=1000,
             temperature=0.7
         )
         recipe_json = response.choices[0].message.content.strip()
@@ -55,8 +55,7 @@ def save_recipe_to_db(recipe_data):
             "instructions": recipe_data.get('instructions', []),
             "prep_time": recipe_data.get('prep_time', 'Unknown'),
             "cook_time": recipe_data.get('cook_time', 'Unknown'),
-            "total_time": recipe_data.get('total_time', 'Unknown'),
-            "link": recipe_data.get('link', 'Unknown')
+            "total_time": recipe_data.get('total_time', 'Unknown')
         }
         result = recipes_collection.insert_one(recipe_document)
         # print(f"Recipe saved successfully with ID: {result.inserted_id}")
