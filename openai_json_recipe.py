@@ -29,9 +29,9 @@ def generate_recipe(prompt):
                 {"role": "system", "content": "You are a professional recipe generator."},
                 {"role": "user", "content": f"Create a detailed recipe based on the following request: {prompt}. "
                                              f"Return the recipe in JSON format with the following keys: "
-                                             f"name, ingredients (list), simplified ingredients (list), instructions (list), prep_time, cook_time, total_time, link."}
+                                             f"name, ingredients (list), simplified ingredients (list), instructions (list), prep_time, cook_time, total_time."}
             ],
-            max_tokens=500,
+            max_tokens=1000,
             temperature=0.7
         )
         recipe_json = response.choices[0].message.content.strip()
@@ -120,4 +120,3 @@ if __name__ == "__main__":
         print(f"Recipe successfully saved to database with ID: {recipe_id}")
     else:
         print("Recipe generation and saving failed.")
-        

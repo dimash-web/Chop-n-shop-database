@@ -16,15 +16,15 @@ from jwt.exceptions import PyJWTError
 
 app = FastAPI()
 
-SECRET_KEY = "2@1&]."  # Use a strong secret key in production
-ALGORITHM = "HS256"  # Algorithm for encoding and decoding JWT tokens
-ACCESS_TOKEN_EXPIRE_MINUTES = 300  # Expiry time for the token
+SECRET_KEY = "2@1&]."  
+ALGORITHM = "HS256" 
+ACCESS_TOKEN_EXPIRE_MINUTES = 3000  
 
 
 # CORS middleware for frontend access
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for testing, adjust as needed
+    allow_origins=["http://localhost:3000"],  
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -181,7 +181,7 @@ async def generate_recipe_with_grocery_list(
             inserted_id = result.inserted_id
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error saving grocery list: {str(e)}")
-
+        print(grocery_list)
         # Step 4: Return the response
         return RecipeResponse(
             recipe_id=str(recipe_id),
@@ -258,7 +258,6 @@ async def login(user: LoginUser):
     access_token = create_access_token(data={"sub": str(existing_user["_id"])})
     return {"message": "Login successful", "access_token": access_token, "token_type": "bearer"}
 
-# Generate a grocery list based on user preferences
 @app.post("/generate_grocery_list/")
 async def generate_grocery_list_endpoint(user_preferences: UserPreferences, list_name: Optional[str] = None, current_user: str = Depends(get_current_user)):
     try:
@@ -275,7 +274,7 @@ async def generate_grocery_list_endpoint(user_preferences: UserPreferences, list
             "Grocery_items": user_preferences.Grocery_items,
             "Dietary_preferences": user_preferences.Dietary_preferences,
             "Allergies": user_preferences.Allergies,
-            "Store_preference": store_preference,  # Safely pass None if no store preference
+            "Store_preference": store_preference,
         })
 
         # Remove _id if present before inserting into the database
@@ -284,6 +283,7 @@ async def generate_grocery_list_endpoint(user_preferences: UserPreferences, list
 
         # Insert the generated grocery list into the collection with user association
         grocery_list["user_id"] = current_user  # Associate the list with the logged-in user
+        grocery_list["created_at"] = datetime.utcnow()
 
         # If a list name is provided, include it in the grocery list document
         if user_preferences.list_name:
@@ -294,7 +294,9 @@ async def generate_grocery_list_endpoint(user_preferences: UserPreferences, list
 
         # Return the grocery list with its new _id
         grocery_list["_id"] = str(grocery_list["_id"])
+        print(grocery_list)
         return {"grocery_list": grocery_list}
+
     except Exception as e:
         print(f"Error generating grocery list: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.")
@@ -353,6 +355,7 @@ async def delete_grocery_list(list_id: str, current_user: str = Depends(get_curr
             status_code=500, 
             detail=f"An error occurred while deleting the grocery list: {str(e)}"
         )
+
 @app.get("/items/")
 async def get_items():
     items = list(items_collection.find())
@@ -381,19 +384,47 @@ async def generate_recipe_route(prompt: RecipePrompt):
         print(f"Error generating recipe: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred.")
 
+# from bson import json_util
+# from fastapi.encoders import jsonable_encoder
+
+# @app.post("/generate_recipe/")
+# async def generate_recipe_route(prompt: RecipePrompt):
+#     try:
+#         recipe = generate_recipe(prompt.recipe_prompt)
+#         if not recipe:
+#             raise HTTPException(status_code=400, detail="Failed to generate recipe. Please try again.")
+        
+#         recipe_id = save_recipe_to_db(recipe)
+#         if not recipe_id:
+#             raise HTTPException(status_code=500, detail="Failed to save recipe to database.")
+        
+#         # Use FastAPI's jsonable_encoder to ensure the response is JSON serializable
+#         return {"recipe": jsonable_encoder(recipe), "recipe_id": recipe_id}
+
+#     except Exception as e:
+#         print(f"Error generating recipe: {str(e)}")
+#         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.")
 
 @app.get("/recipes/{recipe_name}/")
 async def get_recipe_by_name(recipe_name: str):
     """
-    Fetch a recipe by its name.
+    Fetch the first recipe that matches the given name, with case-insensitive partial matching.
     """
     try:
-        recipe = recipes_collection.find_one({"name": recipe_name})
-        if not recipe:
-            raise HTTPException(status_code=404, detail="Recipe not found")
+        # Create a case-insensitive regex pattern
+        name_pattern = f".*{recipe_name}.*"
+        
+        # Use a case-insensitive regex query and get only the first match
+        recipe = recipes_collection.find_one(
+            {"name": {"$regex": name_pattern, "$options": "i"}}
+        )
 
-        # Convert ObjectId to string and return the recipe
+        if not recipe:
+            raise HTTPException(status_code=404, detail="No recipe found matching the query")
+
+        # Convert ObjectId to string
         recipe["_id"] = str(recipe["_id"])
+
         return recipe
 
     except Exception as e:
@@ -413,44 +444,44 @@ async def get_current_user(user_email: str):
         "allergies": user.get("allergies", []),
     }
 
-@app.post("/grocery_lists/{list_id}/add_item")
-async def add_item_to_grocery_list(
-    list_id: str, 
-    new_item: NewGroceryItem, 
-    current_user: str = Depends(get_current_user)
-):
-    try:
-        # Validate the list_id
-        if not ObjectId.is_valid(list_id):
-            raise HTTPException(status_code=400, detail="Invalid list ID")
+# @app.post("/grocery_lists/{list_id}/add_item")
+# async def add_item_to_grocery_list(
+#     list_id: str, 
+#     new_item: NewGroceryItem, 
+#     current_user: str = Depends(get_current_user)
+# ):
+#     try:
+#         # Validate the list_id
+#         if not ObjectId.is_valid(list_id):
+#             raise HTTPException(status_code=400, detail="Invalid list ID")
 
-        # Find the grocery list
-        grocery_list = grocery_lists_collection.find_one({
-            "_id": ObjectId(list_id),
-            "user_id": current_user
-        })
+#         # Find the grocery list
+#         grocery_list = grocery_lists_collection.find_one({
+#             "_id": ObjectId(list_id),
+#             "user_id": current_user
+#         })
 
-        if not grocery_list:
-            raise HTTPException(status_code=404, detail="Grocery list not found or you don't have permission to modify it")
+#         if not grocery_list:
+#             raise HTTPException(status_code=404, detail="Grocery list not found or you don't have permission to modify it")
 
-        # Add the new item to the grocery list
-        new_item_dict = new_item.dict()
-        grocery_lists_collection.update_one(
-            {"_id": ObjectId(list_id)},
-            {"$push": {"grocery_list": new_item_dict}}
-        )
+#         # Add the new item to the grocery list
+#         new_item_dict = new_item.dict()
+#         grocery_lists_collection.update_one(
+#             {"_id": ObjectId(list_id)},
+#             {"$push": {"grocery_list": new_item_dict}}
+#         )
 
-        # Update the total cost
-        new_total_cost = grocery_list.get("total_cost", 0) + new_item.Price
-        grocery_lists_collection.update_one(
-            {"_id": ObjectId(list_id)},
-            {"$set": {"total_cost": new_total_cost}}
-        )
+#         # Update the total cost
+#         new_total_cost = grocery_list.get("total_cost", 0) + new_item.Price
+#         grocery_lists_collection.update_one(
+#             {"_id": ObjectId(list_id)},
+#             {"$set": {"total_cost": new_total_cost}}
+#         )
 
-        return {"message": f"Item '{new_item.Item_name}' added to the grocery list successfully"}
+#         return {"message": f"Item '{new_item.Item_name}' added to the grocery list successfully"}
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"An error occurred while adding the item: {str(e)}")
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"An error occurred while adding the item: {str(e)}")
 
 @app.post("/recipes/save")
 async def save_recipe(
