@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends, status,Header
 from pydantic import BaseModel, condecimal
-#from bson import ObjectId
+from bson import ObjectId
 from fastapi.middleware.cors import CORSMiddleware
 from passlib.context import CryptContext
 from typing import List, Optional
@@ -559,3 +559,57 @@ async def get_saved_recipes(current_user: str = Depends(get_current_user)):
             status_code=500,
             detail=f"Error fetching saved recipes: {str(e)}"
         )
+
+@app.delete("/grocery_lists/{list_id}/items/{item_name}")
+async def delete_item_from_grocery_list(
+    list_id: str,
+    item_name: str,
+    current_user: str = Depends(get_current_user)
+):
+    print(f"Attempting to delete item: {item_name} from list: {list_id}")
+
+    try:
+        # Validate the list_id
+        if not ObjectId.is_valid(list_id):
+            raise HTTPException(status_code=400, detail="Invalid list ID")
+
+        # Find the grocery list
+        grocery_list = grocery_lists_collection.find_one({
+            "_id": ObjectId(list_id),
+            "user_id": current_user
+        })
+
+        print(f"grocery_list: {grocery_list}")
+        if "grocery_list" not in grocery_list or not isinstance(grocery_list["grocery_list"], list):
+            raise HTTPException(status_code=500, detail="Invalid grocery list structure")
+
+        if not grocery_list:
+            raise HTTPException(status_code=404, detail="Grocery list not found or you don't have permission to modify it")
+
+        # Check if the item exists in the grocery list
+        item = next((item for item in grocery_list["grocery_list"] if item["item_name"] == item_name), None)
+        
+        if not item:
+            raise HTTPException(status_code=404, detail=f"Item '{item_name}' not found in the grocery list")
+
+        # Remove the item from the grocery list
+        result = grocery_lists_collection.update_one(
+            {"_id": ObjectId(list_id), "user_id": current_user},
+            {"$pull": {"grocery_list": {"item_name": item_name}}}
+        )
+
+        if result.modified_count == 0:
+            raise HTTPException(status_code=404, detail="Error removing item from the grocery list")
+
+        # Update the total cost
+        updated_list = grocery_lists_collection.find_one({"_id": ObjectId(list_id)})
+        new_total_cost = sum(item["Price"] for item in updated_list["grocery_list"])
+        grocery_lists_collection.update_one(
+            {"_id": ObjectId(list_id)},
+            {"$set": {"total_cost": new_total_cost}}
+        )
+
+        return {"message": f"Item '{item_name}' removed from the grocery list successfully"}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred while removing the item: {str(e)}")
