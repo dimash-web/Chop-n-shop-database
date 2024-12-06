@@ -3,12 +3,11 @@ python-dotenv
 pandas
 uuid
 uvicorn
-fastapi[standard]
+fastapi
 openai
 bcrypt
 faiss-cpu
 sentence_transformers
-bson
 scipy
 passlib
 pyjwt
